@@ -148,7 +148,7 @@ public static class Validated
                 f2 => Fail<F, S>(f1.Combine(f2)),
                 _ => Fail<F, S>(f1)),
             map => source.Match(
-                f2 => Fail<F, S>(f2),
+                Fail<F, S>,
                 x => Succeed<F, S>(map(x))));
     }
 

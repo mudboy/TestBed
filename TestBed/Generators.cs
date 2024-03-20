@@ -83,22 +83,38 @@ public static class Gen
     }
  
     private static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
-    
-    public static Gen<C> BiMap<A, B, C>(this Gen<A> underlying, Gen<B> sb, Func<A, B, C> f) =>
-        from a in underlying
-        from b in sb
-        select f(a, b);
-    
-    public static Gen<IEnumerable<A>> Sequence<A>(this IEnumerable<Gen<A>> actions) =>
-        actions.Aggregate(Unit(Nil<A>()), (acc, f) => f.BiMap(acc, (a, xs) => xs.Append(a)));
 
-    public static Gen<TResult> Apply<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) =>
+    // map(select) can be defined in terms of BiMap(map2) and Unit
+    public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
+        ga.BiMap(Unit<B>(default!), (a, _) => f(a));
+    
+    // BiMap(map2) can be defined directly for this type and is applicative
+    public static Gen<C> BiMap<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
         r =>
         {
-            var (f, rng1) = self(r);
-            var (v, rng2) = source(rng1);
-            return (f(v), rng2);
+            var (a, rng1) = ga(r);
+            var (b, rng2) = gb(rng1);
+            return (f(a,b), rng2);
         };
+
+    // or it can be defined with selectMany/bind (and this is general for all monads)
+    public static Gen<C> BiMapM<A, B, C>(this Gen<A> @ga, Gen<B> gb, Func<A, B, C> fc) =>
+        ga.SelectMany(a => gb.Select(b => fc(a, b)));
+
+    /// <summary>
+    /// Convert an IEnumerable{Gen{A}} to Gen{IEnumerable{A}} 
+    /// </summary>
+    /// <param name="actions">the list of Gen{A}s</param>
+    /// <typeparam name="A">the type contained in the Gen{A}</typeparam>
+    /// <returns></returns>
+    public static Gen<IEnumerable<A>> Sequence<A>(this IEnumerable<Gen<A>> actions) =>
+        actions.Traverse(x => x);
+    
+    public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
+        las.Aggregate(Unit(Nil<B>()), (acc, a) => f(a).BiMap(acc, (b, xs) => xs.Append(b)));
+
+    public static Gen<TResult> Apply<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) =>
+        self.BiMap(source, (f, a) => f(a));
     
     public static Gen<TResult> ApplyM<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) => 
         self.SelectMany(source.Select);
@@ -159,8 +175,7 @@ public static class Gen
                     '9' => Digit(acc.rng),
                     _ => (c, acc.rng)
                 };
-                acc.builder.Append(v.Item1);
-                return (acc.builder, v.Item2);
+                return (acc.builder.Append(v.Item1), v.Item2);
             });
 
             return (res.builder.ToString(), res.rng);
@@ -208,9 +223,7 @@ public static partial class Main
 
         var sg = AlphaNumericStringN(10);
         var s = sg(r);
-    
-
-    
+        
         Console.WriteLine("Gen First law " + FirstLaw());
         Console.WriteLine("Gen Second law " + SecondLaw());
 
@@ -237,6 +250,8 @@ public static partial class Main
 // lift a function to the Gen<> world apply an argument (i.e call it)
         var genF = Unit(EssBefore).Apply(Unit("123"))(r);
         Console.WriteLine("lift and apply = " + genF);
+
+        Unit(EssBefore).BiMap(Unit("123"), (a, b) => a(b));
 
 // choose example
         var lostOfInts = Choose(1, 10).ListOfN(25); //(new Random(2));

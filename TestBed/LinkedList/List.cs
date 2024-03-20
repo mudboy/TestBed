@@ -23,6 +23,7 @@ internal sealed record Empty<T> : List<T>
 {
     public static List<T> Instance => new Empty<T>();
 }
+
 internal sealed record Cons<T>(T Head, List<T> Tail) : List<T>;
 
 public readonly record struct NilList;
