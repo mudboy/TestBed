@@ -39,10 +39,6 @@ public sealed class WordNumbers
             if (xs > 0)
             {
                 var words = HundredsToWords(xs);
-                if (magnitude.Item1 == 1.0 && !words.Contains("and") && !string.IsNullOrEmpty(words))
-                {
-                    finalWords.Add("and");
-                }
                 finalWords.Add(words);
                 finalWords.Add(magnitude.Item2);
 
@@ -56,6 +52,7 @@ public sealed class WordNumbers
     private static string HundredsToWords(int input)
     {
         var words = new List<string>();
+        var hasTens = false;
 
         // hundreds
         var hundreds = (int)Math.Floor(input / 100.0);
@@ -67,40 +64,35 @@ public sealed class WordNumbers
         }
 
         // teens
+        var tens = (int)Math.Floor(input / 10.0);
         if (input >= 11 & input <= 19)
         {
-            if (words.Count == 2)
-            {
-                words.Add("and");
-            }
-
             words.Add(teens[input - 10]);
             input -= input;
         }
         else // tens
         {
-            var tens = (int)Math.Floor(input / 10.0);
             if (tens > 0)
             {
-                if (words.Count == 2)
-                {
-                    words.Add("and");
-                }
-
-                words.Add($"{WordNumbers.tens[tens]}");
+                words.Add(WordNumbers.tens[tens]);
                 input -= tens * 10;
+                hasTens = true;
             }
         }
 
         // units
         if (input > 0)
         {
-            if (words.Count == 2)
+            if (hasTens)
             {
-                words.Add("and");
+                var tenword = words.Last();
+                words.Remove(tenword);
+                words.Add(tenword + "-" + units[input]);
             }
-
-            words.Add(units[input]);
+            else
+            {
+                words.Add(units[input]);
+            }
         }
 
         return string.Join(" ", words);
@@ -111,7 +103,7 @@ public static partial class Main
 {
     public static void ExamplesWords()
     {
-        Console.WriteLine("Enter a number between 0 and 99999999");
+        Console.WriteLine($"Enter a number between 0 and {int.MaxValue}");
         for (;;)
         {
             Console.Write(":> ");
@@ -120,6 +112,10 @@ public static partial class Main
             {
                 var words = WordNumbers.NumberToWords(number);
                 Console.WriteLine(words);
+            }
+            else
+            {
+                Console.WriteLine($"'{value}' was not a valid int");
             }
         }
     }

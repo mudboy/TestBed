@@ -10,6 +10,18 @@ public static class FuncExt
     [Pure]
     public static B Apply<A, B>(this A a, Func<A, B> f) =>
         f(a);
+    
+    public static Func<B, Func<A, C>> CurryR<A, B, C>(this Func<A, B, C> f) =>
+        x => y => f(y, x);
+
+    
+    public static Func<T1, Func<T2, R>> Curry<T1, T2, R>(this Func<T1, T2, R> f) =>
+        x => y => f(x, y);    
+    public static Func<T1, Func<T2, T3, R>> Curry<T1, T2, T3, R>(this Func<T1, T2, T3, R> f) =>
+        x => (y, z) => f(x, y, z);
+    
+    public static Func<T1, Func<T2, T3, R>> CurryFirst<T1, T2, T3, R>
+        (this Func<T1, T2, T3, R> @this) => t1 => (t2, t3) => @this(t1, t2, t3);
 }
 
 public static partial class Main

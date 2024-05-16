@@ -113,23 +113,14 @@ public static class OptionExtensions
 
     // apply right
     public static Option<Func<A, C>> ApplyR<A, B, C>(this Option<Func<A, B, C>> optF, Option<B> optB) =>
-        optF.Select(CurryR).Apply(optB);
+        optF.Select(FuncExt.CurryR).Apply(optB);
 
     public static Option<Func<T2, R>> Apply<T1, T2, R>(this Option<Func<T1, T2, R>> optF, Option<T1> optT) 
-        => optF.Select(Curry).Apply(optT);    
+        => optF.Select(FuncExt.Curry).Apply(optT);    
     
     public static Option<Func<T2, T3, R>> Apply<T1, T2, T3, R>(this Option<Func<T1, T2, T3, R>> optF, Option<T1> optT) 
-        => Apply(optF.Select(Curry), optT);
+        => Apply(optF.Select(FuncExt.Curry), optT);
     
-    public static Func<B, Func<A, C>> CurryR<A, B, C>(this Func<A, B, C> f) =>
-        x => y => f(y, x);
-
-    
-    public static Func<T1, Func<T2, R>> Curry<T1, T2, R>(this Func<T1, T2, R> f) =>
-        x => y => f(x, y);    
-    public static Func<T1, Func<T2, T3, R>> Curry<T1, T2, T3, R>(this Func<T1, T2, T3, R> f) =>
-        x => (y, z) => f(x, y, z);
-
     // Traverse allows mapping a world crossing function to a functor
     // so you get M[List[A]] not List[M[a]] i.e. it flips the order of the types 
     // this is the monadic version (will short circuit on error)
