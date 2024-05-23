@@ -2,7 +2,8 @@
 
 using BenchmarkDotNet.Running;
 using Benchy;
+using TestBed;
 
 Console.WriteLine("Hello, World!");
 
-BenchmarkRunner.Run<MyBenchys>();
+BenchmarkRunner.Run<WordsBenchy>();
