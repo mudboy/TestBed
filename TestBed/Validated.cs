@@ -1,3 +1,5 @@
+using Albedo;
+
 namespace TestBed;
 
 
@@ -201,7 +203,7 @@ public static class Validated
     }
 }
 
-public class DumbObject
+public sealed class DumbObject
 {
     public string Name { get; }
     public int Age { get; }
@@ -253,5 +255,20 @@ public static partial class Main
         var p = v.Match(e => e.ToString(), x => "");
         
         Console.WriteLine(p);
+
+        var mi = Exts.Methods<SimpleClass>().Select(v => v.SimpleMethod(1));
+    }
+}
+
+public class SimpleClass
+{
+    public int SimpleMethod(int x) => x;
+}
+
+public static class Exts
+{
+    public static Methods<A> Methods<A>()
+    {
+        return new Methods<A>();
     }
 }

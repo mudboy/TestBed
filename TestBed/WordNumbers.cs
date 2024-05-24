@@ -28,10 +28,7 @@ public static class WordNumbers
     public static string NumberToWords(long input)
     {
         if (input < 0)
-        {
             throw new ArgumentOutOfRangeException();
-        }
-
         if (input == 0)
             return "zero";
 
@@ -39,19 +36,16 @@ public static class WordNumbers
         foreach (var (mag, title) in magnitudes)
         {
             var xs = (long)Math.Floor((decimal)(input / mag));
-            if (xs > 0)
-            {
-                HundredsToWords(finalWords, xs);
-                finalWords.Add(title);
-
-                input -= xs * mag;
-            }
+            if (xs <= 0) continue;
+            HundredsToWords(finalWords, xs);
+            finalWords.Add(title);
+            input -= xs * mag;
         }
         
         return string.Join(" ", finalWords);
     }
 
-    private static void HundredsToWords(List<string> words, long input)
+    private static void HundredsToWords(ICollection<string> words, long input)
     {
         var hundreds = (long)Math.Floor(input / 100.0);
         input -= hundreds * 100;
@@ -61,7 +55,7 @@ public static class WordNumbers
         
         if (hundreds != 0)
         {
-            words.Add(Units[hundreds]);
+            words.Add(Units[hundreds]!);
             words.Add("hundred");
         }
 
