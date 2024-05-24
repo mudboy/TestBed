@@ -5,6 +5,7 @@ namespace TestBed.Applicatives;
 
 public delegate (Deck, IEnumerable<Card>) Deal(Deck d);
 
+// from https://blog.ploeh.dk/2018/10/08/full-deck/
 public static class Applicatives
 {
     public static List<Suit> allSuits = new() {Hearts, Clubs, Spades, Diamonds};
