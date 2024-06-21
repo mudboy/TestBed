@@ -32,6 +32,8 @@ public static class Rng
     public static (B, IRng) Select<A, B>(this (A, IRng) rng, Func<A,B> f) =>
             (f(rng.Item1), rng.Item2);
     
+    public static (int, IRng) Int(this IRng rng) => rng.NextInt();
+    
     public static (double, IRng) Double(this IRng rng)
     {
         var (i, r) = rng.NonNegativeInt();

@@ -27,11 +27,34 @@ public static class State
         from b in sb
         select f(a, b);
 
-    public static State<S, A> Apply<S, A>(State<S, A> f) =>  f;
+    public static State<S, B> Apply<S, A, B>(this State<S, Func<A, B>> fs, State<S, A> parameter) =>  fs.SelectMany(parameter.Select);
 
     private static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
 
     public static State<S, IEnumerable<A>> Sequence<S, A>(IEnumerable<State<S, A>> actions) =>
         actions.Aggregate(Unit<S, IEnumerable<A>>(Nil<A>()), (acc, f) => f.BiMap(acc, (a, xs) => xs.Append(a)));
 
+    public static void Main()
+    {
+        int Func(string s) => s.Length;
+        Unit<int, Func<string, int>>(Func).Apply(Unit<int, string>("test"));
+
+        State<int, string> countit(string text) => state =>
+        {
+
+            const string vowels = "aeiouy";
+            var expanded = text.SelectMany(c =>
+                vowels.Contains(c) ? Enumerable.Repeat(c, state) : new[] { c });
+
+            var newState = state + 1;
+
+            return (new string(expanded.ToArray()), newState);
+        };
+
+        var result = countit("test").Run(0);
+
+        Console.WriteLine(result);
+
+
+    }
 }

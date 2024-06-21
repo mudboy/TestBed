@@ -22,6 +22,9 @@ public static class FuncExt
     
     public static Func<T1, Func<T2, T3, R>> CurryFirst<T1, T2, T3, R>
         (this Func<T1, T2, T3, R> @this) => t1 => (t2, t3) => @this(t1, t2, t3);
+
+    public static Func<B, A, C> Flip<A, B, C>(this Func<A, B, C> f)
+        => (b, a) => f(a, b);
 }
 
 public static partial class Main
@@ -46,6 +49,10 @@ public static partial class Main
 
         var x = 5.0.Apply(TimeSpan.FromHours)
                       .Apply(WithDuration);
+
+        var f = (string s, int x) => 5.0;
+
+        var g = f.Flip();
     }
 
     private static int WithDuration(TimeSpan ts) => 10;

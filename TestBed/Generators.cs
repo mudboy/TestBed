@@ -1,5 +1,6 @@
 using System.Text;
 using static TestBed.Gen;
+using static TestBed.IEnumExt;
 
 namespace TestBed;
 
@@ -9,35 +10,7 @@ public delegate Gen<T> SGen<T>(int n);
 
 public static class Gen
 {
-
-    public static bool FirstLaw()
-    {
-        int Id(int x) => x;
-        var m = Unit(123456);
-        var r1 = Rng.Simple(42);
-        return m(r1).Item1 == m.Select(Id)(r1).Item1;
-    }
-
-    public static bool SecondLaw()
-    {
-        int F(string s) => s.Length;
-        bool G(int i) => i % 2 == 0;
-        var r1 = Rng.Simple(42);
-
-        Gen<string> m = Unit("Tests");
-
-        return m.Select(F).Select(G)(r1).Item1 == m.Select(s => G(F(s)))(r1).Item1;
-    }
-    
-    private static IEnumerable<A> Fill<A>(int n, A e)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            yield return e;
-        }
-    }
-
-    public static Gen<int> Int => r => r.NextInt();
+    public static Gen<int> Int => Rng.Int;
     public static Gen<double> Double => Rng.Double;
     public static Gen<bool> Bool => Rng.Bool;
     
@@ -81,9 +54,7 @@ public static class Gen
         var g1Threshold = Math.Abs(g1.Item2) / (Math.Abs(g1.Item2) + Math.Abs(g2.Item2));
         return Double.SelectMany(d => d < g1Threshold ? g1.Item1 : g2.Item1);
     }
- 
-    private static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
-
+    
     // map(select) can be defined in terms of BiMap(map2) and Unit
     public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
         ga.BiMap(Unit<B>(default!), (a, _) => f(a));
@@ -151,8 +122,8 @@ public static class Gen
         // the easy way let the HOF do the work
         return pattern.Select(c => c switch
         {
-            'A' => Char,
-            '9' => Digit,
+            '?' => Char,
+            '#' => Digit,
             _ => Unit(c)
         }).Sequence().Select(string.Concat);
     }
@@ -186,9 +157,9 @@ public static class Gen
         Select(Rng.NonNegativeInt, n => start + n % (stopExclusive - start));
 
     public static readonly Gen<string> Postcode = 
-        from pattern in OneOf("AA99", "AA9", "A99", "A9", "A9A", "AA9A")
+        from pattern in OneOf("??##", "??#", "?##", "?#", "?#?", "??#?")
         from outCode in FromPattern(pattern)
-        from inCode in FromPattern("9AA")
+        from inCode in FromPattern("#??")
         select $"{outCode} {inCode}".ToUpper();
 
     public static A Run<A>(this IRng rng, Gen<A> gen) => gen(rng).Item1;
@@ -224,9 +195,6 @@ public static partial class Main
         var sg = AlphaNumericStringN(10);
         var s = sg(r);
         
-        Console.WriteLine("Gen First law " + FirstLaw());
-        Console.WriteLine("Gen Second law " + SecondLaw());
-
         var tree = TreeFunctor.Tree.Create(42,
             TreeFunctor.Tree.Create(123, TreeFunctor.Tree.Leaf(1), TreeFunctor.Tree.Leaf(2)),
             TreeFunctor.Tree.Create(234));
@@ -240,7 +208,6 @@ public static partial class Main
         string BothEssAndQue(string s) => EssBefore(QueAfter(s));
 
         var taintingFunctions = OneOf(EssBefore, QueAfter, BothEssAndQue);
-        var xx = OneOf(Digit, Gen.Char);
         var taintedPostcodes = taintingFunctions.Apply(Postcode);
 
         var listOfTaintedPostcodes = ListOfN(25, taintedPostcodes)(r);

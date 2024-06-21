@@ -5,6 +5,9 @@ namespace TestBed;
 
 public static class IEnumExt
 {
+    public static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
+    public static IEnumerable<A> Fill<A>(int n, A e) => Enumerable.Repeat(e, n);
+
     public static IEnumerable<R> Apply<T, R>(this IEnumerable<T> source, IEnumerable<Func<T, R>> fs)
     {
         return from func in fs from v in source select func(v);
