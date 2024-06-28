@@ -26,7 +26,7 @@ public static class Gen
         Fill(n, g).Sequence().Select(x => x.ToList());
 
     public static Gen<R> Select<T, R>(this Gen<T> self, Func<T, R> f) =>
-        self.SelectMany(a => Unit(f(a)));
+        self.SelectMany(a => Return(f(a)));
     
 
     public static Gen<R> SelectMany<T, R>(this Gen<T> self, Func<T, Gen<R>> f) =>
@@ -44,7 +44,7 @@ public static class Gen
     
     public static Gen<char> Char => Choose(65, 91).Union(Choose(97, 123)).Select(x => (char)x);
     
-    public static Gen<T> Unit<T>(T value) => rng => (value, rng);
+    public static Gen<T> Return<T>(T value) => rng => (value, rng);
     
     public static Gen<A> Union<A>(this Gen<A> a, Gen<A> b) =>
         Bool.SelectMany(x => x ? a : b);
@@ -57,7 +57,7 @@ public static class Gen
     
     // map(select) can be defined in terms of BiMap(map2) and Unit
     public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
-        ga.BiMap(Unit<B>(default!), (a, _) => f(a));
+        ga.BiMap(Return<B>(default!), (a, _) => f(a));
     
     // BiMap(map2) can be defined directly for this type and is applicative
     public static Gen<C> BiMap<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
@@ -82,7 +82,7 @@ public static class Gen
         actions.Traverse(x => x);
     
     public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
-        las.Aggregate(Unit(Nil<B>()), (acc, a) => f(a).BiMap(acc, (b, xs) => xs.Append(b)));
+        las.Aggregate(Return(Nil<B>()), (acc, a) => f(a).BiMap(acc, (b, xs) => xs.Append(b)));
 
     public static Gen<TResult> Apply<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) =>
         self.BiMap(source, (f, a) => f(a));
@@ -117,14 +117,14 @@ public static class Gen
             throw new ArgumentNullException(nameof(pattern));
 
         if (pattern.Length == 0)
-            return Unit("");
+            return Return("");
         
         // the easy way let the HOF do the work
         return pattern.Select(c => c switch
         {
             '?' => Char,
             '#' => Digit,
-            _ => Unit(c)
+            _ => Return(c)
         }).Sequence().Select(string.Concat);
     }
 
@@ -186,7 +186,7 @@ public static partial class Main
         var doubles = Gen.Double.ListOfN(100)(Rng.Simple(57));
         doubles.Item1.Print("10 random doubles");
 
-        var weighted = Weighted((Unit("A"), 0.25), (Unit("B"), 0.75)).ListOfN(1000)(Rng.Simple(43566754));
+        var weighted = Weighted((Return("A"), 0.25), (Return("B"), 0.75)).ListOfN(1000)(Rng.Simple(43566754));
         weighted.Item1.Print("100 weighted a&bs");
         Console.WriteLine("A count = " + weighted.Item1.Count(s => s == "A"));
         
@@ -215,10 +215,10 @@ public static partial class Main
         listOfTaintedPostcodes.Item1.Print();
 
 // lift a function to the Gen<> world apply an argument (i.e call it)
-        var genF = Unit(EssBefore).Apply(Unit("123"))(r);
+        var genF = Return(EssBefore).Apply(Return("123"))(r);
         Console.WriteLine("lift and apply = " + genF);
 
-        Unit(EssBefore).BiMap(Unit("123"), (a, b) => a(b));
+        Return(EssBefore).BiMap(Return("123"), (a, b) => a(b));
 
 // choose example
         var lostOfInts = Choose(1, 10).ListOfN(25); //(new Random(2));

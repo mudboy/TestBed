@@ -16,7 +16,7 @@ public sealed class GenTest
     public void Should_Obey_The_First_Functor_Law(int a)
     {
         int Id(int x) => x;
-        var m = Unit(a);
+        var m = Return(a);
         
         // mapping the id func is the same as calling the thing directly
         m.Should().BeSameAs(m.Select(Id));
@@ -30,7 +30,7 @@ public sealed class GenTest
     {
         int F(string s) => s.Length;
         bool G(int i) => i % 2 == 0;
-        var m = Unit(a);
+        var m = Return(a);
 
         // the order of grouping maps together is like brackets for adding (a + b) + c == a + (b + c)
         m.Select(F).Select(G).Should().BeSameAs(m.Select(x => G(F(x))));
@@ -42,11 +42,11 @@ public sealed class GenTest
     [InlineData(53)]
     public void Should_Obey_Monad_Left_Identity_Law(int a)
     {
-        Gen<string> F(int i) => Unit(i.ToString());
+        Gen<string> F(int i) => Return(i.ToString());
 
         // binding on a value wrapped via unit is the same as calling the thing directly
         // unit is on the left of bind
-        Unit(a).SelectMany(F).Should().BeSameAs(F(a));
+        Return(a).SelectMany(F).Should().BeSameAs(F(a));
     }    
     
     [Theory]
@@ -55,12 +55,12 @@ public sealed class GenTest
     [InlineData("test")]
     public void Should_Obey_Monad_Right_Identity_Law(string a)
     {
-        Gen<int> F(string s) => Unit(s.Length);
+        Gen<int> F(string s) => Return(s.Length);
         var m = F(a);
 
         // binding unit on the result of calling f is the same as calling the thing directly
         // unit is on the right of bind - unit is basically the id func for the monad
-        m.SelectMany(Unit).Should().BeSameAs(m);
+        m.SelectMany(Return).Should().BeSameAs(m);
     }
 
     [Theory]
@@ -69,9 +69,9 @@ public sealed class GenTest
     [InlineData(2)]
     public void Should_Obey_The_Associativity_Law(double a)
     {
-        Gen<bool> F(double i) => Unit(i % 2 == 0);
-        Gen<string> G(bool b) => Unit(b.ToString());
-        Gen<int> H(string s) => Unit(s.Length);
+        Gen<bool> F(double i) => Return(i % 2 == 0);
+        Gen<string> G(bool b) => Return(b.ToString());
+        Gen<int> H(string s) => Return(s.Length);
         var m = F(a);
  
         // the order of grouping binds together is like brackets for adding (a + b) + c == a + (b + c)
@@ -87,14 +87,9 @@ public static class GenExtensions
     } 
 }
 
-public sealed class GenAssertions<A> : 
-    ReferenceTypeAssertions<Gen<A>, GenAssertions<A>>
+public sealed class GenAssertions<A>(Gen<A> instance) :
+    ReferenceTypeAssertions<Gen<A>, GenAssertions<A>>(instance)
 {
-    public GenAssertions(Gen<A> instance)
-        : base(instance)
-    {
-    }
-
     protected override string Identifier => "Gen";
 
     public new AndConstraint<GenAssertions<A>> BeSameAs(
