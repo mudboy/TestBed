@@ -78,6 +78,9 @@ public readonly struct Option<A>
 
     public Option<B> Select2<B>(Func<A, B> selector) =>
         Match(a => Some(selector(a)), Option<B>.CreateNothing);
+
+    public Option<A> Where(Func<A, bool> predicate) =>
+        SelectMany(x => predicate(x) ? Some(x) : None);
     
     public static implicit operator Option<A>(A value) => CreateSome(value);
     public static implicit operator Option<A>(OptionalNone _) => CreateNothing();
