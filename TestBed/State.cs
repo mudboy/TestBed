@@ -1,16 +1,23 @@
+using System.Net.Http.Headers;
+
 namespace TestBed;
 
 
-public delegate (A, S) State<S, A>(S s);
+public delegate (A Value, S State) State<S, A>(S s);
 
 public static class State
 {
-    public static (A, S) Run<S, A>(this State<S, A> underlying, S s) => underlying(s);
+    public static (A Value, S State) Run<S, A>(this State<S, A> underlying, S s) => underlying(s);
 
-    public static State<S, T> Unit<S, T>(T a) => s => (a, s);
+    public static State<S, A> Return<S, A>(A a) => s => (a, s);
+
+    public static State<S, S> Get<S>() => s => (s, s);
+    public static State<S, Unit> Put<S>(S s) => _ => (Unit.Value, s);
+
+    public static State<S, Unit> Modify<S>(Func<S, S> modify) => Get<S>().SelectMany(s => Put(modify(s)));
 
     public static State<S, B> Select<S, A, B>(this State<S, A> underlying, Func<A, B> f) =>
-        underlying.SelectMany(a => Unit<S, B>(f(a)));
+        underlying.SelectMany(a => Return<S, B>(f(a)));
     
     public static State<S, B> SelectMany<S, A, B>(this State<S, A> underlying, Func<A, State<S, B>> f) =>
         s => {
@@ -23,38 +30,54 @@ public static class State
         underlying.SelectMany(a => f(a).Select(b => project(a, b)));
 
     public static State<S, C> BiMap<S, A, B, C>(this State<S, A> underlying, State<S, B> sb, Func<A, B, C> f) =>
-        from a in underlying
-        from b in sb
-        select f(a, b);
-
-    public static State<S, B> Apply<S, A, B>(this State<S, Func<A, B>> fs, State<S, A> parameter) =>  fs.SelectMany(parameter.Select);
-
-    private static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
-
-    public static State<S, IEnumerable<A>> Sequence<S, A>(IEnumerable<State<S, A>> actions) =>
-        actions.Aggregate(Unit<S, IEnumerable<A>>(Nil<A>()), (acc, f) => f.BiMap(acc, (a, xs) => xs.Append(a)));
-
-    public static void Main()
-    {
-        int Func(string s) => s.Length;
-        Unit<int, Func<string, int>>(Func).Apply(Unit<int, string>("test"));
-
-        State<int, string> countit(string text) => state =>
+        // from a in underlying
+        // from b in sb
+        // select f(a, b);
+        s =>
         {
-
-            const string vowels = "aeiouy";
-            var expanded = text.SelectMany(c =>
-                vowels.Contains(c) ? Enumerable.Repeat(c, state) : new[] { c });
-
-            var newState = state + 1;
-
-            return (new string(expanded.ToArray()), newState);
+            var (a, s1) = underlying(s);
+            var (b, s2) = sb(s1);
+            return (f(a, b), s2);
         };
 
-        var result = countit("test").Run(0);
+    public static State<S, B> ApplyM<S, A, B>(this State<S, Func<A, B>> fs, State<S, A> parameter) =>
+        fs.SelectMany(parameter.Select);
 
-        Console.WriteLine(result);
+    public static State<S, B> Apply<S, A, B>(this State<S, Func<A, B>> fs, State<S, A> parameter) =>
+        fs.BiMap(parameter, (f, a) => f(a));
 
+    public static State<S, IEnumerable<B>> Traverse<S, A, B>(this IEnumerable<A> input, Func<A, State<S, B>> f) =>
+        input.Aggregate(Return<S, IEnumerable<B>>(Enumerable.Empty<B>()), // simulate fold right
+            (acc, a) => acc.BiMap(f(a), (b, bs) => b.Append(bs)));
 
-    }
+    public static State<S, IEnumerable<A>> Sequence<S, A>(IEnumerable<State<S, A>> actions) =>
+        actions.Traverse(x => x);
+    
 }
+
+public static class Machines
+{
+    public static State<Machine, (int Coins, int Candies)> SimulateMachine(params Input[] inputs)
+    {
+        return from _ in inputs.Traverse(i => State.Modify(Update(i)))
+            from s in State.Get<Machine>()
+            select (s.Candies, s.Coins);
+    }
+
+    public static Func<Machine, Machine> Update(Input i) => s =>
+        (i, s) switch
+        {
+            (_, (_, 0, _)) => s, // no candy left
+            (Input.Coin, (false, _, _)) => s, // coin in unlocked machine
+            (Input.Turn, (true, _, _)) => s, // turn locked machine
+            (Input.Coin, (true, var candy, var coin)) // coin in locked machine
+                => new Machine(false, candy, coin + 1),
+            (Input.Turn, (false, var candy, var coin)) // turn unlocked machine
+                => new Machine(true, candy - 1, coin),
+            _ => throw new ArgumentOutOfRangeException()
+        };
+}
+
+public record struct Machine(bool Locked, int Candies, int Coins);
+public enum Input {Coin, Turn}
+
