@@ -4,6 +4,9 @@ namespace TestBed;
 
 public static class FuncExt
 {
+
+    public static Func<A, A> AndThen<A>(this Func<A, A> first, Func<A, A> second) => a => second(first(a));
+
     public static Func<A, A> Compose<A>(params Func<A, A>[] fs) =>
         fs.Aggregate((g, f) => x => f(g(x)));
     
@@ -25,6 +28,9 @@ public static class FuncExt
 
     public static Func<B, A, C> Flip<A, B, C>(this Func<A, B, C> f)
         => (b, a) => f(a, b);
+
+    public static Gen<Func<B, C>> Map<A, B, C>(this Func<A, B, C> f, Gen<A> ma) =>
+        ma.Select(a => Curry(f)(a));
 }
 
 public static partial class Main
@@ -38,6 +44,8 @@ public static partial class Main
         Func<string, string> a = x => x + "A";
         Func<string, string> b = x => x + "B";
         Func<string, string> c = x => x + "C";
+
+        var d = a.AndThen(b);
 
         Console.WriteLine(FuncExt.Compose(a, b, c)(""));
 

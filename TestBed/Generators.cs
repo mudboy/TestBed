@@ -1,8 +1,14 @@
 using System.Text;
 using static TestBed.Gen;
 using static TestBed.IEnumExt;
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedType.Global
 
 namespace TestBed;
+
+// converted from
+// https://github.com/fpinscala/fpinscala/blob/second-edition/src/main/scala/fpinscala/answers/testing/Gen.scala
 
 public delegate (T, IRng) Gen<T>(IRng r);
 
@@ -13,17 +19,27 @@ public static class Gen
     public static Gen<int> Int => Rng.Int;
     public static Gen<double> Double => Rng.Double;
     public static Gen<bool> Bool => Rng.Bool;
-    
-    public static SGen<List<A>> List<A>(this Gen<A> self) => n => ListOfN(n, self);
-    public static SGen<List<A>> NonEmptyList<A>(this Gen<A> self) => n => ListOfN(Math.Max(n, 1), self);
-    public static SGen<A> UnSized<A>(this Gen<A> self) => _ => self;
 
-    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, int n) => ListOfN(n, self);
+    public static Gen<IEnumerable<A>> ListOfN<A>(int n, Gen<A> g) =>
+        Fill(n, g).Sequence().Select(x => x);
 
-    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, Gen<int> size) => size.SelectMany(self.ListOfN);
+    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, int n) => 
+        ListOfN(n, self).Select(l => l.ToList());
+
+    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, Gen<int> size) => 
+        size.SelectMany(x => self.ListOfN(Math.Max(0, x)));
     
-    public static Gen<List<A>> ListOfN<A>(int n, Gen<A> g) =>
-        Fill(n, g).Sequence().Select(x => x.ToList());
+    public static SGen<List<A>> List<A>(this Gen<A> self) => 
+        n => ListOfN(n, self).Select(l => l.ToList());
+    
+    public static SGen<List<A>> NonEmptyList<A>(this Gen<A> self) => 
+        n => ListOfN(Math.Max(n, 1), self).Select(l => l.ToList());
+    
+    public static SGen<A> UnSized<A>(this Gen<A> self) => 
+        _ => self;
+    
+    public static Gen<IEnumerable<A>> NonEmptyEnumerable<A>(this Gen<A> g) =>
+        Choose(1, 127).SelectMany(i => ListOfN(i, g));
 
     public static Gen<R> Select<T, R>(this Gen<T> self, Func<T, R> f) =>
         self.SelectMany(a => Return(f(a)));
@@ -40,11 +56,16 @@ public static class Gen
         self.SelectMany(x => fromFirst(x).Select(y => project(x, y))); 
 
     
-    public static Gen<char> Digit => Choose(48, 58).Select(x => (char)x);
+    public static Gen<char> Digit => 
+        Choose(48, 58).Select(x => (char)x);
     
-    public static Gen<char> Char => Choose(65, 91).Union(Choose(97, 123)).Select(x => (char)x);
+    public static Gen<char> Char => 
+        Choose(65, 91)
+            .Union(Choose(97, 123))
+            .Select(x => (char)x);
     
-    public static Gen<T> Return<T>(T value) => rng => (value, rng);
+    public static Gen<T> Return<T>(T value) => 
+        rng => (value, rng);
     
     public static Gen<A> Union<A>(this Gen<A> a, Gen<A> b) =>
         Bool.SelectMany(x => x ? a : b);
@@ -98,8 +119,11 @@ public static class Gen
     public static Gen<string> AlphaNumericStringN(int n) => 
         ListOfN(n, Char.Union(Digit)).Select(string.Concat);
 
-    public static Gen<T> OneOf<T>(params T[] choices) => Choose(0, choices.Length).Select(x => choices[x]);
-    public static Gen<T> OneOf<T>(params Gen<T>[] choices) => Choose(0, choices.Length).SelectMany(x => choices[x]);
+    public static Gen<T> OneOf<T>(params T[] choices) => 
+        Choose(0, choices.Length).Select(x => choices[x]);
+    public static Gen<T> OneOf<T>(params Gen<T>[] choices) => 
+        Choose(0, choices.Length).SelectMany(x => choices[x]);
+    
 
     /// <summary>
     /// Generates a random string based a simple pattern made of
@@ -198,7 +222,7 @@ public static partial class Main
         var tree = TreeFunctor.Tree.Create(42,
             TreeFunctor.Tree.Create(123, TreeFunctor.Tree.Leaf(1), TreeFunctor.Tree.Leaf(2)),
             TreeFunctor.Tree.Create(234));
-
+        
         var mappedTree = tree.Select(i => i.ToString());
 
         Console.WriteLine(mappedTree);
@@ -207,7 +231,7 @@ public static partial class Main
         string QueAfter(string s) => s + "-q";
         string BothEssAndQue(string s) => EssBefore(QueAfter(s));
 
-        var taintingFunctions = OneOf(EssBefore, QueAfter, BothEssAndQue);
+        var taintingFunctions = Gen.OneOf(EssBefore, QueAfter, BothEssAndQue);
         var taintedPostcodes = taintingFunctions.Apply(Postcode);
 
         var listOfTaintedPostcodes = ListOfN(25, taintedPostcodes)(r);

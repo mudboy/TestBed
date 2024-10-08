@@ -109,7 +109,7 @@ public static class WordNumbers2
             {
                 Console.Write(":> ");
                 var value = Console.ReadLine();
-                var words = WordNumbers2.NumberToWords(value);
+                var words = NumberToWords(value??"");
                 Console.WriteLine(words);
             }
         }

@@ -125,7 +125,7 @@ public sealed class StateTests
     {
         var initialState = new Machine(true, 10, 0);
         Input[] input = [Input.Coin, Input.Turn, Input.Turn, Input.Turn];
-        var stateMachine = Machines.SimulateMachine(input);
+        var stateMachine = Candy.SimulateMachine(input);
 
         var result = stateMachine.Run(initialState);
         

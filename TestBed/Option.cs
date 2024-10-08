@@ -8,7 +8,7 @@ public readonly struct Option<A>
 
     private static readonly IOptional OnlyNone = new NoValue();
     private readonly IOptional _impl;
-
+    
     public Option()
     {
         _impl = OnlyNone;

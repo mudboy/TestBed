@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Engines;
 using TestBed;
 
 namespace Benchy;
@@ -27,3 +28,22 @@ public class WordsBenchy
     [Benchmark]
     public string Words2() => WordNumbers2.NumberToWords("999999");
 }
+
+[MemoryDiagnoser]
+public class AnaBenchy
+{
+    [Benchmark]
+    public bool Ana1() => Anagrams.IsAnagramSorted("basiparachromatin", "marsipobranchiata");
+    [Benchmark]
+    public bool Ana2() => Anagrams.IsAnagramHashed("basiparachromatin", "marsipobranchiata");
+}
+
+[MemoryDiagnoser]
+public class DatesBenchy
+{
+    [Benchmark]
+    public void DatesWithOGStyle() => Anagrams.EnumerateDates(new DateOnly(1999, 1, 1), new DateOnly(1999, 3, 20)).Consume(new Consumer());
+    [Benchmark]
+    public void DatesWithFunkyStype() => Anagrams.EnumerateDates2(new DateOnly(1999, 1, 1), new DateOnly(1999, 3, 20)).Consume(new Consumer());
+}
+

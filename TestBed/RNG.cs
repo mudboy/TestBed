@@ -1,11 +1,15 @@
 namespace TestBed;
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedType.Global
+
+// converted from
+// https://github.com/fpinscala/fpinscala/blob/second-edition/src/main/scala/fpinscala/answers/state/State.scala
 
 public interface IRng
 {
     (int, IRng) NextInt();
 }
-
-public delegate (A, IRng) Rand<A>(IRng r);
 
 public static class Rng
 {
@@ -22,17 +26,27 @@ public static class Rng
     }
 
     public static IRng Simple(long seed) => new SimpleImpl(seed);
+
+    public static IRng Default() => new SimpleImpl(DateTime.Now.Ticks);
+    
     
     public static (int, IRng) NonNegativeInt(this IRng rng)
     {
         var (i, r) = rng.NextInt();
         return (i < 0 ? -(i + 1) : i, r);
+    }    
+    
+    public static (int, IRng) NaturalNumber(this IRng rng)
+    {
+        var (i, r) = rng.NonNegativeInt();
+        return (1 + i % (int.MaxValue - 1), r);
     }
     
     public static (B, IRng) Select<A, B>(this (A, IRng) rng, Func<A,B> f) =>
             (f(rng.Item1), rng.Item2);
     
-    public static (int, IRng) Int(this IRng rng) => rng.NextInt();
+    public static (int, IRng) Int(this IRng rng) => 
+        rng.NextInt();
     
     public static (double, IRng) Double(this IRng rng)
     {
@@ -40,16 +54,9 @@ public static class Rng
         return (i * (1.0 / int.MaxValue), r);
     }
 
-    public static (bool, IRng) Bool(this IRng rng)
-    {
-        var (i, r) = rng.NextInt();
-        return (i % 2 == 0, r);
-    }
-    
-    public static Rand<B> Select<A, B>(this Rand<A> s, Func<A, B> f) =>
-        rng =>
+    public static (bool, IRng) Bool(this IRng rng) =>
+        rng.NextInt() switch
         {
-            var (a, r) = s(rng);
-            return (f(a), r);
+            var (i, r2) => (i % 2 == 0, r2)
         };
 }

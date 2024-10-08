@@ -5,6 +5,13 @@ namespace TestBed;
 
 public static class IEnumExt
 {
+    public static (IEnumerable<A>, IEnumerable<A>) Break<A>(this IEnumerable<A> source, Func<A, bool> predicate)
+    {
+        var a = source.SkipWhile(x => !predicate(x));
+        var b = source.TakeWhile(predicate);
+        return (a, b);
+    } 
+    
     public static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
     public static IEnumerable<A> Fill<A>(int n, A e) => Enumerable.Repeat(e, n);
 

@@ -6,4 +6,4 @@ using TestBed;
 
 Console.WriteLine("Hello, World!");
 
-BenchmarkRunner.Run<WordsBenchy>();
+BenchmarkRunner.Run<DatesBenchy>();
