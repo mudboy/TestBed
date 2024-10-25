@@ -1,0 +1,7 @@
+﻿<Solution>
+  <Project Path="ActorEx\ActorEx.csproj" Type="Classic C#" />
+  <Project Path="Benchy\Benchy.csproj" Type="Classic C#" />
+  <Project Path="DataFirst\DataFirst.csproj" Type="Classic C#" />
+  <Project Path="TestBed\TestBed.csproj" Type="Classic C#" />
+  <Project Path="Testys\Testys.csproj" Type="Classic C#" />
+</Solution>

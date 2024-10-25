@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataFirst", "DataFirst\Data
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Testys", "Testys\Testys.csproj", "{4E96C959-7E29-44B6-AA57-BC2FA9D46827}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorEx", "ActorEx\ActorEx.csproj", "{C9D425E9-D728-4515-B0DB-ABCC33465274}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{4E96C959-7E29-44B6-AA57-BC2FA9D46827}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E96C959-7E29-44B6-AA57-BC2FA9D46827}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E96C959-7E29-44B6-AA57-BC2FA9D46827}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C9D425E9-D728-4515-B0DB-ABCC33465274}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9D425E9-D728-4515-B0DB-ABCC33465274}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9D425E9-D728-4515-B0DB-ABCC33465274}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9D425E9-D728-4515-B0DB-ABCC33465274}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

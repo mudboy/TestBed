@@ -1,6 +1,8 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using TestBed;
+using TestBed.monads;
+using TestBed.monads.other;
 
 namespace Benchy;
 
@@ -45,5 +47,31 @@ public class DatesBenchy
     public void DatesWithOGStyle() => Anagrams.EnumerateDates(new DateOnly(1999, 1, 1), new DateOnly(1999, 3, 20)).Consume(new Consumer());
     [Benchmark]
     public void DatesWithFunkyStype() => Anagrams.EnumerateDates2(new DateOnly(1999, 1, 1), new DateOnly(1999, 3, 20)).Consume(new Consumer());
+}
+
+[MemoryDiagnoser]
+public class ResultBenchy
+{
+
+    public static string ss = string.Join(",", Enumerable.Range(1, 100));
+    
+    private Result<int> Parse(string x)
+    {
+        return int.TryParse(x, out var val) ? Result.Success(val) : Result.Failure($"No: {val}");
+    }
+    
+    private ResultX<int> ParseOld(string x)
+    {
+        return int.TryParse(x, out var val) ? ResultX.Success(val) : ResultX.Fail($"No: {val}");
+    }
+    
+    [Benchmark]
+    public void SubStyle() => ss.Split(',')
+        .Traverse(Parse)
+        .GetOrElse([]).Consume(new Consumer());
+    
+    [Benchmark]
+    public void OldStyle() => ss.Split(',')
+        .Traverse(ParseOld).Match(x => x, _ => []).Consume(new Consumer());
 }
 

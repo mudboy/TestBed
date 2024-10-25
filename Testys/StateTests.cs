@@ -143,4 +143,14 @@ public sealed class StateTests
 
             return (new string(expanded.ToArray()), newState);
         };
+
+    [Fact]
+    public void DoEither()
+    {
+        var fail = new Failure<int>(new Exception("Bang!"));
+
+        var xx = fail.Select(x => x.ToString());
+
+        xx.Should().BeOfType<Try<string>>();
+    }
 }

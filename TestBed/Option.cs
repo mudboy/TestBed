@@ -60,14 +60,14 @@ public readonly struct Option<A>
     }
 
     internal static Option<A> CreateSome(A value) => new(new SomeValue(value));
-    internal static Option<A> CreateNothing() => new(OnlyNone);
+    internal static Option<A> None() => new(OnlyNone);
 
     public bool HasValue => _impl.HasValue;
 
     public B Match<B>(Func<A, B> some, Func<B> none) => _impl.Match(some, none);
     public void Match(Action<A> some, Action none) => _impl.Match(some, none);
     
-    public Option<B> SelectMany<B>(Func<A, Option<B>> bind) => _impl.Match(bind, Option<B>.CreateNothing);
+    public Option<B> SelectMany<B>(Func<A, Option<B>> bind) => _impl.Match(bind, Option<B>.None);
 
     public Option<C> SelectMany<B, C>(Func<A, Option<B>> bind, Func<A, B, C> project)
     {
@@ -77,13 +77,13 @@ public readonly struct Option<A>
     public Option<B> Select<B>(Func<A, B> selector) => SelectMany(x => Option<B>.CreateSome(selector(x)));
 
     public Option<B> Select2<B>(Func<A, B> selector) =>
-        Match(a => Some(selector(a)), Option<B>.CreateNothing);
+        Match(a => Some(selector(a)), Option<B>.None);
 
     public Option<A> Where(Func<A, bool> predicate) =>
-        SelectMany(x => predicate(x) ? Some(x) : None);
+        SelectMany(x => predicate(x) ? Some(x) : None());
     
     public static implicit operator Option<A>(A value) => CreateSome(value);
-    public static implicit operator Option<A>(OptionalNone _) => CreateNothing();
+    public static implicit operator Option<A>(OptionalNone _) => None();
     public static bool operator true(Option<A> value) => value.HasValue;
     public static bool operator false(Option<A> value) => !value.HasValue;
 
@@ -149,10 +149,20 @@ public static class OptionExtensions
                     .Apply(optBs)
                     .Apply(f(a))
         );
+    
+    // Traverse can also be defined with Map2
+    public static Option<IEnumerable<B>> Traverse2<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f) =>
+        ts.Aggregate(
+            seed: Some(Enumerable.Empty<B>()),
+            func: (acc, a) =>
+                f(a).Map2(acc, (b, bs) => bs.Append(b))
+        );
 
     public static Option<IEnumerable<B>> TraverseA2<A, B>(this IEnumerable<A> list, Func<A, Option<B>> f)
         => list.Aggregate(
-            seed: Some(Enumerable.Empty<B>()), (acc, x) => f(x).Map2(acc, (b, xs) => xs.Append(b)));
+            seed: Some(Enumerable.Empty<B>()), 
+            func: (acc, x) => 
+                f(x).Map2(acc, (b, xs) => xs.Append(b)));
 
     // default to the applicative version
     public static Option<IEnumerable<B>> Traverse<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f)
@@ -177,20 +187,13 @@ public static class OptionExtensions
         oa.Match(
             a => ob.Match(
                 b => Some(f(a, b)), 
-                Option<C>.CreateNothing), 
-            Option<C>.CreateNothing);
+                Option<C>.None), 
+            Option<C>.None);
     
     // Map2 can also be defined with the primitive apply and unit
     public static Option<C> Map2WithApply<A, B, C>(this Option<A> oa, Option<B> ob, Func<A, B, C> f) =>
         Some(f).Apply(oa).Apply(ob);
-
-    // Traverse can also be defined with Map2
-    public static Option<IEnumerable<B>> Traverse2<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f) =>
-        ts.Aggregate(
-            seed: Some(Enumerable.Empty<B>()),
-            func: (acc, a) =>
-                f(a).Map2(acc, (b, bs) => bs.Append(b))
-        );
+    
 
     // join can be defined be bind
     public static Option<A> Join<A>(this Option<Option<A>> ooa) =>
@@ -198,7 +201,7 @@ public static class OptionExtensions
 
     // or directly for the type 
     public static Option<A> Join2<A>(this Option<Option<A>> ooa) =>
-        ooa.Match(oa => oa, Option<A>.CreateNothing);
+        ooa.Match(oa => oa, Option<A>.None);
 
     // bind can be defined with return/map/join as an alternative to
     // bind/return
