@@ -6,4 +6,4 @@ using TestBed;
 
 Console.WriteLine("Hello, World!");
 
-BenchmarkRunner.Run<ResultBenchy>();
+BenchmarkRunner.Run<AnaBenchy>();

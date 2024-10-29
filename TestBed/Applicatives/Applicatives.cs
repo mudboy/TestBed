@@ -1,4 +1,5 @@
 using TestBed.HigherKinds;
+using Utils;
 using static TestBed.Applicatives.Suit;
 using static TestBed.Applicatives.Face;
 

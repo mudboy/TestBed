@@ -1,10 +1,9 @@
 using System.Diagnostics.Contracts;
 
-namespace TestBed;
+namespace Utils;
 
 public static class FuncExt
 {
-
     public static Func<A, A> AndThen<A>(this Func<A, A> first, Func<A, A> second) => a => second(first(a));
 
     public static Func<A, A> Compose<A>(params Func<A, A>[] fs) =>
@@ -28,9 +27,6 @@ public static class FuncExt
 
     public static Func<B, A, C> Flip<A, B, C>(this Func<A, B, C> f)
         => (b, a) => f(a, b);
-
-    public static Gen<Func<B, C>> Map<A, B, C>(this Func<A, B, C> f, Gen<A> ma) =>
-        ma.Select(a => Curry(f)(a));
 }
 
 public static partial class Main

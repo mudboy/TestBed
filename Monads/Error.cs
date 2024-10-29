@@ -1,6 +1,6 @@
-namespace TestBed.monads;
+namespace Monads;
 
-public readonly record struct ErrorResult(string Message) 
+public readonly record struct Error(string Message) 
 {
     public override string ToString()
     {

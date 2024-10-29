@@ -1,7 +1,7 @@
-using System.Runtime.InteropServices.ComTypes;
-using static TestBed.Option;
+using Utils;
+using static Monads.Option;
 
-namespace TestBed;
+namespace Monads;
 
 public readonly struct Option<A>
 {

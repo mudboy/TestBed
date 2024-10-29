@@ -1,15 +1,16 @@
 using FluentAssertions;
-using TestBed;
+using Monads;
+using TestBed.monads.Try;
 using Xunit;
 
 namespace Testys;
 
 public sealed class StateTests
 {
-    public static readonly Guid Monday =
+    private static readonly Guid Monday =
         new Guid("5AB18569-29C7-4041-9719-5255266B808D");
 
-    public static readonly Guid OtherDays =
+    private static readonly Guid OtherDays =
         new Guid("00553FC8-82C9-40B2-9FAA-F9ADFFD4EE66");
     
     [Theory]
@@ -22,11 +23,12 @@ public sealed class StateTests
     [InlineData(DayOfWeek.Sunday)]
     public void FirstFunctorLaw(DayOfWeek day)
     {
-        Func<Guid, Guid> id = g => g;
         State<DayOfWeek, Guid> dayIdentifier = 
             s => s == DayOfWeek.Monday ? (Monday, DayOfWeek.Tuesday) : (OtherDays, DayOfWeek.Monday);
         
-        Assert.Equal(dayIdentifier.Run(day), dayIdentifier.Select(id).Run(day));
+        Assert.Equal(dayIdentifier.Run(day), dayIdentifier.Select((Func<Guid, Guid>)Id).Run(day));
+        return;
+        Guid Id(Guid g) => g;
     }
     
     [Theory]
@@ -152,5 +154,16 @@ public sealed class StateTests
         var xx = fail.Select(x => x.ToString());
 
         xx.Should().BeOfType<Try<string>>();
+
+        var result = Result.Success(1);
+        var result2 = Result.Success(2);
+        var f = (int x) => result2;
+
+        var x = result >> Add5 >> Add5;
+
+        x.Should().Be(Result.Success(11));
+
     }
+
+    private static Result<int> Add5(int x) => x + 5;
 }

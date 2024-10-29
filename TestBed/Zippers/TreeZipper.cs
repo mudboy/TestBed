@@ -4,6 +4,9 @@ public abstract record Tree<A>()
 {
     public static implicit operator Tree<A>(EmptyTree _) => new Empty<A>();
 
+    public static implicit operator Tree<A>((A value, Tree<A> left, Tree<A> right) p) =>
+        new Node<A>(p.value, p.left, p.right);
+
     public abstract B Match<B>(Func<A, Tree<A>, Tree<A>, B> whenNode, Func<B> whenEmpty);
 };
 
@@ -30,16 +33,33 @@ public static class Tree
     public static EmptyTree Empty => new();
     public static Tree<A> Leaf<A>(A value) => new Node<A>(value, Empty, Empty);
     public static Tree<A> Node<A>(A value, Tree<A> left, Tree<A> right) => new Node<A>(value, left, right);
+    
 }
 
-public record Crumb<T>;
-public sealed record CrumbLeft<T>(T x, Tree<T> r) : Crumb<T>;
-public sealed record CrumbRight<T>(T x, Tree<T> l) : Crumb<T>;
+public abstract record Crumb<T>
+{
+    public abstract R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right);
+}
+public sealed record CrumbLeft<T>(T x, Tree<T> r) : Crumb<T>
+{
+    public override R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right) => left(x, r);
+}
+
+public sealed record CrumbRight<T>(T x, Tree<T> l) : Crumb<T>
+{
+    public override R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right)
+    {
+        return right(x, l);
+    }
+}
 
 public record Zipper<A, B>(A focus, List<B> breadcrumbs);
 
-public sealed record TZip<A>(Tree<A> focus, List<Crumb<A>> crumbs) : 
-    Zipper<Tree<A>, Crumb<A>>(focus, crumbs); 
+public sealed record TZip<A>(Tree<A> focus, List<Crumb<A>> crumbs) :
+    Zipper<Tree<A>, Crumb<A>>(focus, crumbs)
+{
+    public static implicit operator TZip<A>((Tree<A> focus, List<Crumb<A>> crumbs) p) => new(p.focus, p.crumbs);
+}
 public static class TreeZipper
 {
     public static TZip<A> Create<A>() => new(Tree.Empty, []);
@@ -94,13 +114,10 @@ public static class TreeZipper
         {
             (Empty<A>, _) => null,
             (Node<A>, []) => null,
-            (Node<A> t,  [var b, .. var bs]) => 
-                b switch
-                {
-                    CrumbLeft<A>(var x, var r) => new TZip<A>(Tree.Node(x, t, r), bs),
-                    CrumbRight<A>(var x, var l) => new TZip<A>(Tree.Node(x, l, t), bs), 
-                    _ => throw new ArgumentOutOfRangeException(nameof(b), b, null)
-                },
+            (Node<A> t,  [var b, .. var bs]) =>
+                b.Match(
+                    left: (x, r) => (Tree.Node(x, t, r), bs),
+                    right: (x, l) => (Tree.Node(x, l, t), bs)),
             _ => throw new ArgumentOutOfRangeException(nameof(z), z, null)
         };
     } 

@@ -1,4 +1,7 @@
-namespace TestBed;
+using TestBed;
+using Utils;
+
+namespace Monads;
 
 public static class LazyExt
 {

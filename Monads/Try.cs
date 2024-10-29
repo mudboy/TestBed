@@ -1,4 +1,4 @@
-namespace TestBed;
+namespace TestBed.monads.Try;
 
 public abstract record Try<T>
 {

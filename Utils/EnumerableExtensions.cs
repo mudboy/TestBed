@@ -1,18 +1,9 @@
-using System.Collections;
-using System.Diagnostics.Tracing;
+namespace Utils;
 
-namespace TestBed;
-
-public static class IEnumExt
+public static class EnumerableExtensions
 {
-    public static (IEnumerable<A>, IEnumerable<A>) Break<A>(this IEnumerable<A> source, Func<A, bool> predicate)
-    {
-        var a = source.SkipWhile(x => !predicate(x));
-        var b = source.TakeWhile(predicate);
-        return (a, b);
-    } 
-    
-    public static IEnumerable<A> Nil<A>() => Enumerable.Empty<A>();
+   
+    public static IEnumerable<A> Nil<A>() => [];
     public static IEnumerable<A> Fill<A>(int n, A e) => Enumerable.Repeat(e, n);
 
     public static IEnumerable<R> Apply<T, R>(this IEnumerable<T> source, IEnumerable<Func<T, R>> fs)

@@ -16,6 +16,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\ActorEx\ActorEx.csproj" />
+      <ProjectReference Include="..\Monads\Monads.csproj" />
       <ProjectReference Include="..\TestBed\TestBed.csproj" />
     </ItemGroup>
 

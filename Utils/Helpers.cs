@@ -1,4 +1,4 @@
-namespace TestBed;
+namespace Utils;
 
 public static class Helpers
 {

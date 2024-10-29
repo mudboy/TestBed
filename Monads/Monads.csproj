@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -6,11 +6,6 @@
         <Nullable>enable</Nullable>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Albedo" Version="2.0.0" />
-      <PackageReference Include="Dunet" Version="1.11.2" />
-    </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Utils\Utils.csproj" />

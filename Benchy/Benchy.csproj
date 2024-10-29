@@ -13,6 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Monads\Monads.csproj" />
       <ProjectReference Include="..\TestBed\TestBed.csproj" />
     </ItemGroup>
 

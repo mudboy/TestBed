@@ -1,11 +1,14 @@
 using System.Text;
-using static TestBed.Gen;
-using static TestBed.IEnumExt;
+using TestBed;
+using Utils;
+using static Monads.Gen;
+using static Utils.EnumerableExtensions;
+
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedType.Global
 
-namespace TestBed;
+namespace Monads;
 
 // converted from
 // https://github.com/fpinscala/fpinscala/blob/second-edition/src/main/scala/fpinscala/answers/testing/Gen.scala
@@ -219,14 +222,6 @@ public static partial class Main
         var sg = AlphaNumericStringN(10);
         var s = sg(r);
         
-        var tree = TreeFunctor.Tree.Create(42,
-            TreeFunctor.Tree.Create(123, TreeFunctor.Tree.Leaf(1), TreeFunctor.Tree.Leaf(2)),
-            TreeFunctor.Tree.Create(234));
-        
-        var mappedTree = tree.Select(i => i.ToString());
-
-        Console.WriteLine(mappedTree);
-
         string EssBefore(string i) => $"s-{i}";
         string QueAfter(string s) => s + "-q";
         string BothEssAndQue(string s) => EssBefore(QueAfter(s));

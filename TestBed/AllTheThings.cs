@@ -1,3 +1,5 @@
+using Utils;
+
 namespace TestBed;
 
 public sealed class Foo<T>

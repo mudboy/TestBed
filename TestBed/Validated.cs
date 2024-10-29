@@ -8,23 +8,23 @@ public interface ICombine<F>
     F Combine(F other);
 }
 
-public readonly struct ErrorResult : ICombine<ErrorResult>
+public readonly struct ErrorResultx : ICombine<ErrorResultx>
 {
     private readonly IEnumerable<string> _error = Enumerable.Empty<string>();
 
-    public ErrorResult(string error)
+    public ErrorResultx(string error)
     {
         _error = _error.Append(error);
     }
 
-    public ErrorResult(IEnumerable<string> errors)
+    public ErrorResultx(IEnumerable<string> errors)
     {
         _error = _error.Concat(errors);
     }
     
-    public ErrorResult Combine(ErrorResult other)
+    public ErrorResultx Combine(ErrorResultx other)
     {
-        return new ErrorResult(_error.Concat(other._error));
+        return new ErrorResultx(_error.Concat(other._error));
     }
 
     public override string ToString()
@@ -214,18 +214,18 @@ public sealed class DumbObject
         Age = age;
     }
     
-    private Validated<ErrorResult, string> TryParseName()
+    private Validated<ErrorResultx, string> TryParseName()
     {
         if (string.IsNullOrEmpty(Name))
-            return Validated.Fail<ErrorResult, string>(new ErrorResult("name empty"));
-        return Validated.Succeed<ErrorResult, string>(Name);
+            return Validated.Fail<ErrorResultx, string>(new ErrorResultx("name empty"));
+        return Validated.Succeed<ErrorResultx, string>(Name);
     } 
     
-    private Validated<ErrorResult, int> TryParseAge()
+    private Validated<ErrorResultx, int> TryParseAge()
     {
         if (Age < 18)
-            return Validated.Fail<ErrorResult, int>(new ErrorResult("not old enough"));
-        return Validated.Succeed<ErrorResult, int>(Age);
+            return Validated.Fail<ErrorResultx, int>(new ErrorResultx("not old enough"));
+        return Validated.Succeed<ErrorResultx, int>(Age);
     }
 
     internal static DumbObject Create(string name, int age)
@@ -233,7 +233,7 @@ public sealed class DumbObject
         return new DumbObject(name, age);
     }
     
-    internal Validated<ErrorResult, DumbObject> TryParse()
+    internal Validated<ErrorResultx, DumbObject> TryParse()
     {
         var createReservation =
             Create;
