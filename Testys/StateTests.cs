@@ -108,8 +108,8 @@ public sealed class StateTests
         var a = State.Return<string, int>(10);
         var b = State.Return<string, int>(2);
 
-        var s = a.BiMap(b, (x, y) => x / y);
-        var ss = s.BiMap(b, (x, y) => x * y)("");
+        var s = a.Map2(b, (x, y) => x / y);
+        var ss = s.Map2(b, (x, y) => x * y)("");
         ss.Value.Should().Be(10);
     }
     

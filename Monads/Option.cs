@@ -140,6 +140,10 @@ public static class OptionExtensions
     public static Option<IEnumerable<A>> Sequence<A>(this IEnumerable<Option<A>> ts)
         => ts.Traverse2(x => x);
 
+    // 
+    public static Option<IEnumerable<B>> TraverseViaSequence<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f)
+        => ts.Select(f).Sequence();
+
     // default to the direct version
     public static Option<C> Map2<A, B, C>(this Option<A> oa, Option<B> ob, Func<A, B, C> f) =>
         oa.Map2Directly(ob, f);

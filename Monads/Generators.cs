@@ -13,13 +13,16 @@ namespace Monads;
 // converted from
 // https://github.com/fpinscala/fpinscala/blob/second-edition/src/main/scala/fpinscala/answers/testing/Gen.scala
 
-public delegate (T, IRng) Gen<T>(IRng r);
+public delegate (IRng, T) Gen<T>(IRng r);
 
 public delegate Gen<T> SGen<T>(int n);
 
 public static class Gen
 {
+    public static A Run<A>(this Gen<A> gen, IRng r) => gen(r).Item2;
     public static Gen<int> Int => Rng.Int;
+    public static Gen<int> NaturalInt => Rng.NaturalNumber;
+    public static Gen<int> NonNegativeInt => Rng.NonNegativeInt;
     public static Gen<double> Double => Rng.Double;
     public static Gen<bool> Bool => Rng.Bool;
 
@@ -51,7 +54,7 @@ public static class Gen
     public static Gen<R> SelectMany<T, R>(this Gen<T> self, Func<T, Gen<R>> f) =>
         r =>
         {
-            var (v, rng) = self(r);
+            var (rng, v) = self(r);
             return f(v)(rng);
         };
 
@@ -66,9 +69,11 @@ public static class Gen
         Choose(65, 91)
             .Union(Choose(97, 123))
             .Select(x => (char)x);
+
+    public static Gen<char> AlphaNumeric => Char.Union(Digit);
     
     public static Gen<T> Return<T>(T value) => 
-        rng => (value, rng);
+        rng => (rng, value);
     
     public static Gen<A> Union<A>(this Gen<A> a, Gen<A> b) =>
         Bool.SelectMany(x => x ? a : b);
@@ -78,7 +83,27 @@ public static class Gen
         var g1Threshold = Math.Abs(g1.weight) / (Math.Abs(g1.weight) + Math.Abs(g2.weight));
         return Double.SelectMany(d => d < g1Threshold ? g1.gen : g2.gen);
     }
-    
+
+    public static Gen<A> Weighted2<A>(params (Gen<A> gen, int weight)[] items) =>
+        NaturalInt.Select(i => i % items.Sum(x => x.weight))
+            .SelectMany(pick =>
+            {
+                (int next, Gen<A>? gen, bool found) seed = (0, null, false); 
+                var selection = items.Aggregate(seed, (acc, item) =>
+                {
+                    var next = acc.next + item.weight;
+                    if (next > pick && !acc.found)
+                    {
+                        acc.gen = item.gen;
+                        acc.found = true;
+                    }
+                
+                    acc.next = next;
+                    return acc;
+                });
+                return selection.gen!;
+            });
+
     // map(select) can be defined in terms of BiMap(map2) and Unit
     public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
         ga.Map2(Return<B>(default!), (a, _) => f(a));
@@ -87,13 +112,13 @@ public static class Gen
     public static Gen<C> Map2<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
         r =>
         {
-            var (a, rng1) = ga(r);
-            var (b, rng2) = gb(rng1);
-            return (f(a,b), rng2);
+            var (rng1, a) = ga(r);
+            var (rng2, b) = gb(rng1);
+            return (rng2, f(a,b));
         };
 
     // or it can be defined with selectMany/bind (and this is general for all monads)
-    public static Gen<C> BiMapM<A, B, C>(this Gen<A> @ga, Gen<B> gb, Func<A, B, C> fc) =>
+    public static Gen<C> BiMapM<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> fc) =>
         ga.SelectMany(a => gb.Select(b => fc(a, b)));
 
     /// <summary>
@@ -112,15 +137,43 @@ public static class Gen
     public static Gen<IEnumerable<A>> Sequence3<A>(this IEnumerable<Gen<A>> actions) =>
         actions.Aggregate(Return(Nil<A>()), (acc, a) => acc.Map2(a, (xs, x) => xs.Append(x)));
 
-    public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
-        las.Aggregate(Return(Nil<B>()), (acc, a) => f(a).Map2(acc, (b, xs) => xs.Append(b)));
-
+    // Here we use and actual lifted function and apply method
+    public static Gen<IEnumerable<A>> Sequence4<A>(this IEnumerable<Gen<A>> actions) =>
+        actions.Aggregate(
+            Return(Nil<A>()),
+            (acc, a) =>
+                Return(Append<A>())
+                    .Apply(acc)
+                    .Apply(a));
+    
     public static async Task<S> Fold<A, S>(this Task<A> task, S initial, Func<S, A, S> folder)
     {
         var val = await task;
         return folder(initial, val);
     }
-        
+    
+    
+    private static Func<IEnumerable<T>, T, IEnumerable<T>> Append<T>()
+        => (ts, t) => ts.Append(t);
+    
+    
+    // direct implementation, like sequence but with the added function call.
+    public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
+        las.Aggregate(
+            Return(Nil<B>()), 
+            (acc, a) => 
+                f(a).Map2(acc, (b, xs) => xs.Append(b)));
+
+    // or can be just as simple as a map then sequence
+    public static Gen<IEnumerable<B>> Traverse2<A, B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
+        las.Select(f).Sequence3();
+    
+    
+    public static Gen<Func<T2, R>> Apply<T1, T2, R>(this Gen<Func<T1, T2, R>> optF, Gen<T1> optT) 
+        => optF.Select(FuncExt.Curry).Apply(optT);      
+    
+    public static Gen<Func<T2, T3, R>> Apply<T1, T2, T3, R>(this Gen<Func<T1, T2, T3, R>> optF, Gen<T1> optT) 
+        => optF.Select(FuncExt.CurryFirst).Apply(optT); 
 
     public static Gen<TResult> Apply<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) =>
         self.Map2(source, (f, a) => f(a));
@@ -134,63 +187,75 @@ public static class Gen
     public static SGen<string> String => StringN;  
     
     public static Gen<string> AlphaNumericStringN(int n) => 
-        ListOfN(n, Char.Union(Digit)).Select(string.Concat);
+        ListOfN(n, AlphaNumeric).Select(string.Concat);
+
+    public static Gen<char> SpecialCharacter => OneOf("!£$%^&*+-=@#~?");
+    public static Gen<string> PasswordStringN(int n) =>
+        ListOfN(n, Weighted2(
+                (SpecialCharacter, 20), 
+                (Char, 40),
+                (Digit, 40)))
+            .Select(string.Concat);
+    
+    public static Gen<char> OneOf(string input) =>
+        Choose(0, input.Length).Select(i => input[i]);
 
     public static Gen<T> OneOf<T>(params T[] choices) => 
         Choose(0, choices.Length).Select(x => choices[x]);
     public static Gen<T> OneOf<T>(params Gen<T>[] choices) => 
         Choose(0, choices.Length).SelectMany(x => choices[x]);
+
+    public static Gen<(A, B)> Both<A, B>(Gen<A> ga, Gen<B> gb) =>
+        Map2(ga, gb, (a, b) => (a, b));
     
 
     /// <summary>
     /// Generates a random string based a simple pattern made of
     /// single character symbols
-    /// A -> character a-zA-z
-    /// 9 -> digit 0-9
-    /// e.g AA99 -> xH83
+    /// ? -> character a-zA-z
+    /// # -> digit 0-9
+    /// e.g ??## -> xH83
     /// all other character in the pattern map to themselves
     /// </summary>
     /// <param name="pattern">the pattern</param>
     /// <returns>a random string based on the pattern</returns>
     public static Gen<string> FromPattern(string pattern)
     {
-        if (pattern == null)
-            throw new ArgumentNullException(nameof(pattern));
+        ArgumentNullException.ThrowIfNull(pattern);
 
         if (pattern.Length == 0)
             return Return("");
         
         // the easy way let the HOF do the work
-        return pattern.Select(c => c switch
+        return pattern.Traverse(c => c switch
         {
             '?' => Char,
             '#' => Digit,
             _ => Return(c)
-        }).Sequence().Select(string.Concat);
+        }).Select(string.Concat);
     }
 
     public static Gen<string> FromPatternAlternative(string pattern)
     {
-        if (pattern == null)
-            throw new ArgumentNullException(nameof(pattern));
+        ArgumentNullException.ThrowIfNull(pattern);
 
         /* the hard way, manually managing the state (rng) */
         return rng =>
         {
             var builder = new StringBuilder(pattern.Length);
-            var seed = (builder, rng);
+            var seed = (rng, builder);
             var res = pattern.Aggregate(seed, (acc, c) =>
             {
                 var v = c switch
                 {
                     'A' => Char(acc.rng),
                     '9' => Digit(acc.rng),
-                    _ => (c, acc.rng)
+                    _ => (acc.rng, c)
                 };
-                return (acc.builder.Append(v.Item1), v.Item2);
+                return (v.Item1, acc.builder.Append(v.Item2));
             });
 
-            return (res.builder.ToString(), res.rng);
+            return (res.rng, res.builder.ToString());
         };
     }
 
@@ -202,8 +267,6 @@ public static class Gen
         from outCode in FromPattern(pattern)
         from inCode in FromPattern("#??")
         select $"{outCode} {inCode}".ToUpper();
-
-    public static A Run<A>(this IRng rng, Gen<A> gen) => gen(rng).Item1;
 }
 
 public static class SGen
@@ -221,20 +284,27 @@ public static partial class Main
 {
     public static void GenExamples()
     {
-        var postcode = Rng.Simple(1234).Run(Postcode);
-        var g = ListOfN(10, Digit)(Rng.Simple(42));
-        g.Item1.Print("10 random digits");
-        var doubles = Gen.Double.ListOfN(100)(Rng.Simple(57));
-        doubles.Item1.Print("10 random doubles");
-
-        var weighted = Weighted((Return("A"), 0.25), (Return("B"), 0.75)).ListOfN(1000)(Rng.Simple(43566754));
-        weighted.Item1.Print("100 weighted a&bs");
-        Console.WriteLine("A count = " + weighted.Item1.Count(s => s == "A"));
+        var r = Rng.Default();
+        //var r = Rng.Simple(42);
+        //var r = Rng.Simple(4980234);
+        //var r = Rng.Simple(10);
         
-        var r = Rng.Simple(420);
+        var postcode = Postcode.Run(r);
+        postcode.Print("a postcode: ");
+        var g = ListOfN(10, Digit).Run(r);
+        g.Print("10 random digits ");
+        var doubles = Gen.Double.ListOfN(100).Run(r);
+        doubles.Print("100 random doubles ");
 
-        var sg = AlphaNumericStringN(10);
-        var s = sg(r);
+        var weighted = Weighted((Return("A"), 0.25), (Return("B"), 0.75)).ListOfN(100).Run(r);
+        weighted.Print("100 weighted a&bs ");
+        Console.WriteLine("A count = " + weighted.Count(s => s == "A"));
+        
+        var sg = AlphaNumericStringN(10).Run(r);
+        sg.Print("length 10 alpha numeric string: ");
+
+        var password = PasswordStringN(14).Run(r);
+        password.Print("A generated password: ");
         
         string EssBefore(string i) => $"s-{i}";
         string QueAfter(string s) => s + "-q";
@@ -243,9 +313,9 @@ public static partial class Main
         var taintingFunctions = Gen.OneOf(EssBefore, QueAfter, BothEssAndQue);
         var taintedPostcodes = taintingFunctions.Apply(Postcode);
 
-        var listOfTaintedPostcodes = ListOfN(25, taintedPostcodes)(r);
+        var listOfTaintedPostcodes = ListOfN(25, taintedPostcodes).Run(r);
 
-        listOfTaintedPostcodes.Item1.Print();
+        listOfTaintedPostcodes.Print();
 
 // lift a function to the Gen<> world apply an argument (i.e call it)
         var genF = Return(EssBefore).Apply(Return("123"))(r);
@@ -257,4 +327,4 @@ public static partial class Main
         var lostOfInts = Choose(1, 10).ListOfN(25); //(new Random(2));
 //lostOfInts.Print();
     }
-} 
+}
