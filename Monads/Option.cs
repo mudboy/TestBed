@@ -3,80 +3,38 @@ using static Monads.Option;
 
 namespace Monads;
 
-public readonly struct Option<A>
+public abstract record Option<A>
 {
 
-    private static readonly IOptional OnlyNone = new NoValue();
-    private readonly IOptional _impl;
-    
-    public Option()
+    public abstract bool  HasValue { get; }
+    public abstract B Match<B>(Func<A, B> some, Func<B> none);
+    public abstract void Match(Action<A> some, Action none);
+
+    private sealed record SomeValue(A Value) : Option<A>
     {
-        _impl = OnlyNone;
-    }
-    
-    private Option(IOptional imple)
-    {
-        _impl = imple;
-    }
-
-    interface IOptional
-    {
-        bool HasValue { get; }
-        B Match<B>(Func<A, B> something, Func<B> nothing);
-        void Match(Action<A> something, Action nothing);
-    }
-
-    private sealed record SomeValue(A Value) : IOptional
-    {
-        public bool HasValue => true;
-
-        public B Match<B>(Func<A, B> something, Func<B> nothing)
-        {
-            return something(Value);
-        }
-
-        public void Match(Action<A> something, Action nothing)
-        {
-            something(Value);
-        }
-
+        public override bool HasValue => true;
+        public override B Match<B>(Func<A, B> some, Func<B> none) => some(Value);
+        public override void Match(Action<A> something, Action nothing) { something(Value); }
         public override string ToString() => $"({Value!.ToString()})";
     }
-    private sealed record NoValue : IOptional
+    
+    private sealed record NoValue : Option<A>
     {
-        public bool HasValue => false;
-
-        public B Match<B>(Func<A, B> something, Func<B> nothing)
-        {
-            return nothing();
-        }
-
-        public void Match(Action<A> something, Action nothing)
-        {
-            nothing();
-        }
-
+        public override bool HasValue => false;
+        public override B Match<B>(Func<A, B> some, Func<B> none) => none();
+        public override void Match(Action<A> some, Action none) => none();
         public override string ToString() => "()";
     }
 
-    internal static Option<A> CreateSome(A value) => new(new SomeValue(value));
-    internal static Option<A> None() => new(OnlyNone);
-
-    public bool HasValue => _impl.HasValue;
-
-    public B Match<B>(Func<A, B> some, Func<B> none) => _impl.Match(some, none);
-    public void Match(Action<A> some, Action none) => _impl.Match(some, none);
+    internal static Option<A> CreateSome(A value) => new SomeValue(value);
+    internal static Option<A> None() => new NoValue();
     
-    public Option<B> SelectMany<B>(Func<A, Option<B>> bind) => _impl.Match(bind, Option<B>.None);
+    public Option<B> SelectMany<B>(Func<A, Option<B>> bind) => Match(bind, Option<B>.None);
 
-    public Option<C> SelectMany<B, C>(Func<A, Option<B>> bind, Func<A, B, C> project)
-    {
-        return SelectMany(x => bind(x).Select(y => project(x, y)));
-    }
+    public Option<C> SelectMany<B, C>(Func<A, Option<B>> bind, Func<A, B, C> project) => 
+        SelectMany(x => bind(x).Select(y => project(x, y)));
     
-    public Option<B> Select<B>(Func<A, B> selector) => SelectMany(x => Option<B>.CreateSome(selector(x)));
-
-    public Option<B> Select2<B>(Func<A, B> selector) =>
+    public Option<B> Select<B>(Func<A, B> selector) =>
         Match(a => Some(selector(a)), Option<B>.None);
 
     public Option<A> Where(Func<A, bool> predicate) =>
@@ -86,8 +44,6 @@ public readonly struct Option<A>
     public static implicit operator Option<A>(OptionalNone _) => None();
     public static bool operator true(Option<A> value) => value.HasValue;
     public static bool operator false(Option<A> value) => !value.HasValue;
-
-    public override string ToString() => _impl.ToString()!;
 }
 
 public record struct OptionalNone;
@@ -101,6 +57,8 @@ public static class Option
 
 public static class OptionExtensions
 {
+    public static Option<A> ToOption<A>(this A? value) => value is not null ? Some(value) : None;
+     
     // primitive definition of apply not using map2
     public static Option<B> Apply<A, B>(this Option<Func<A, B>> optF, Option<A> optA) =>
         optF.Match(
@@ -109,6 +67,7 @@ public static class OptionExtensions
                     some: a => Some(f(a)), 
                     none: () => None), 
             none: () => None);
+
 
     // apply using map2
     public static Option<B> ApplyViaMap2<A, B>(this Option<Func<A, B>> optF, Option<A> optA) =>
@@ -135,7 +94,14 @@ public static class OptionExtensions
                 from b in f(a)
                 select bs.Append(b)
         );
-    
+
+    // while lists of things are traversable so is option as you can think of it
+    // as a list of 1 or 0 items (this is true for all types that are alternatives, Either, Result, Validation, etc...) 
+    public static Task<Option<B>> Traverse<A, B>(this Option<A> opt, Func<A, Task<B>> f) =>
+        opt.Match(
+            some: async a => Some(await f(a)),
+            none: () => Task.FromResult(Option<B>.None()));
+
     // helper function
     private static Func<IEnumerable<T>, T, IEnumerable<T>> Append<T>()
         => (ts, t) => ts.Append(t);
@@ -206,7 +172,7 @@ public static class OptionExtensions
     // bind can be defined with return/map/join as an alternative to
     // bind/return
     public static Option<B> SelectMany_Join<A, B>(this Option<A> oa, Func<A, Option<B>> f) =>
-        oa.Select2(f).Join();
+        oa.Select(f).Join();
 }
 
 public static partial class Main

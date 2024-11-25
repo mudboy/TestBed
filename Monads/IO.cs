@@ -1,5 +1,3 @@
-using System.ComponentModel.Design;
-
 namespace Monads;
 
 
@@ -7,7 +5,7 @@ public delegate Either<Error, A>IO<in Env, A>(Env e);
 
 public static class IO
 {
-    public static IO<Env, A> Pure<Env, A>(A value) => env => value;
+    public static IO<Env, A> Pure<Env, A>(A value) => _ => value;
 
     public static Either<Error, A> Run<Env, A>(this IO<Env, A> ma, Env env)
     {
@@ -38,10 +36,10 @@ public static class IO
 
 public interface ConsoleIO
 {
-    string ReadLine();
+    string? ReadLine();
     Unit WriteLine(string value);
 
-    public static IO<Env, string> ReadLine<Env>()
+    public static IO<Env, string?> ReadLine<Env>()
         where Env : ConsoleIO =>
         env => env.ReadLine();
 
@@ -68,6 +66,7 @@ public interface IntIO
         env => env.TryParse(input);
 }
 
+public class Game<RT> where RT : ConsoleIO, FileIO;
 public static class Example
 {
     public static void Main()
@@ -83,7 +82,7 @@ public static class Example
 public class LiveEnv : FileIO, ConsoleIO
 {
     public string ReadAllText(string path) => File.ReadAllText(path);
-    public string ReadLine() => Console.ReadLine();
+    public string? ReadLine() => Console.ReadLine();
     public Unit WriteLine(string value) { Console.WriteLine(value); return Unit.Value; }
 }
 

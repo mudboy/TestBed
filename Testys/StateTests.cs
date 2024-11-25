@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Monads;
-using TestBed.monads.Try;
 using Xunit;
 
 namespace Testys;
@@ -26,7 +25,7 @@ public sealed class StateTests
         State<DayOfWeek, Guid> dayIdentifier = 
             s => s == DayOfWeek.Monday ? (Monday, DayOfWeek.Tuesday) : (OtherDays, DayOfWeek.Monday);
         
-        Assert.Equal(dayIdentifier.Run(day), dayIdentifier.Select((Func<Guid, Guid>)Id).Run(day));
+        Assert.Equal(dayIdentifier.Run(day), dayIdentifier.Select(Id).Run(day));
         return;
         Guid Id(Guid g) => g;
     }
@@ -149,7 +148,7 @@ public sealed class StateTests
     [Fact]
     public void DoEither()
     {
-        var fail = new Failure<int>(new Exception("Bang!"));
+        var fail = Result.Failure<int>(new Error("Bang!"));
 
         var xx = fail.Select(x => x.ToString());
 

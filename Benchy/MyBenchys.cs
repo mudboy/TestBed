@@ -2,7 +2,6 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using Monads;
 using TestBed;
-using TestBed.monads;
 
 namespace Benchy;
 

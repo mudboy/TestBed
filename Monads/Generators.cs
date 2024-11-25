@@ -73,18 +73,18 @@ public static class Gen
     public static Gen<A> Union<A>(this Gen<A> a, Gen<A> b) =>
         Bool.SelectMany(x => x ? a : b);
     
-    public static Gen<A> Weighted<A>((Gen<A>, double) g1, (Gen<A>, double) g2)
+    public static Gen<A> Weighted<A>((Gen<A> gen, double weight) g1, (Gen<A> gen, double weight) g2)
     {
-        var g1Threshold = Math.Abs(g1.Item2) / (Math.Abs(g1.Item2) + Math.Abs(g2.Item2));
-        return Double.SelectMany(d => d < g1Threshold ? g1.Item1 : g2.Item1);
+        var g1Threshold = Math.Abs(g1.weight) / (Math.Abs(g1.weight) + Math.Abs(g2.weight));
+        return Double.SelectMany(d => d < g1Threshold ? g1.gen : g2.gen);
     }
     
     // map(select) can be defined in terms of BiMap(map2) and Unit
     public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
-        ga.BiMap(Return<B>(default!), (a, _) => f(a));
+        ga.Map2(Return<B>(default!), (a, _) => f(a));
     
     // BiMap(map2) can be defined directly for this type and is applicative
-    public static Gen<C> BiMap<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
+    public static Gen<C> Map2<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
         r =>
         {
             var (a, rng1) = ga(r);
@@ -104,15 +104,29 @@ public static class Gen
     /// <returns></returns>
     public static Gen<IEnumerable<A>> Sequence<A>(this IEnumerable<Gen<A>> actions) =>
         actions.Traverse(x => x);
-    
+
+    // Sequence can be defined as a SelectMany then select this version is monadic i.e. each step depended on the last
+    public static Gen<IEnumerable<A>> Sequence2<A>(this IEnumerable<Gen<A>> actions) => 
+        actions.Aggregate(Return(Nil<A>()), (acc, a) => acc.SelectMany(xs => a.Select(x => xs.Append(x))));
+
+    public static Gen<IEnumerable<A>> Sequence3<A>(this IEnumerable<Gen<A>> actions) =>
+        actions.Aggregate(Return(Nil<A>()), (acc, a) => acc.Map2(a, (xs, x) => xs.Append(x)));
+
     public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
-        las.Aggregate(Return(Nil<B>()), (acc, a) => f(a).BiMap(acc, (b, xs) => xs.Append(b)));
+        las.Aggregate(Return(Nil<B>()), (acc, a) => f(a).Map2(acc, (b, xs) => xs.Append(b)));
+
+    public static async Task<S> Fold<A, S>(this Task<A> task, S initial, Func<S, A, S> folder)
+    {
+        var val = await task;
+        return folder(initial, val);
+    }
+        
 
     public static Gen<TResult> Apply<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) =>
-        self.BiMap(source, (f, a) => f(a));
+        self.Map2(source, (f, a) => f(a));
     
     public static Gen<TResult> ApplyM<T, TResult>(this Gen<Func<T, TResult>> self, Gen<T> source) => 
-        self.SelectMany(source.Select);
+        self.SelectMany<Func<T, TResult>, TResult>(source.Select);
     
     public static Gen<string> StringN(int n) =>
         ListOfN(n, Char).Select(string.Concat);
@@ -237,7 +251,7 @@ public static partial class Main
         var genF = Return(EssBefore).Apply(Return("123"))(r);
         Console.WriteLine("lift and apply = " + genF);
 
-        Return(EssBefore).BiMap(Return("123"), (a, b) => a(b));
+        Return(EssBefore).Map2(Return("123"), (a, b) => a(b));
 
 // choose example
         var lostOfInts = Choose(1, 10).ListOfN(25); //(new Random(2));

@@ -81,8 +81,8 @@ public static class EnumerableExtensions
 
     public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> source, Random rng)
     {
-        if (source == null) throw new ArgumentNullException(nameof(source));
-        if (rng == null) throw new ArgumentNullException(nameof(rng));
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(rng);
 
         return source.ShuffleIterator(rng);
     }
@@ -91,9 +91,9 @@ public static class EnumerableExtensions
         this IEnumerable<T> source, Random rng)
     {
         var buffer = source.ToList();
-        for (int i = 0; i < buffer.Count; i++)
+        for (var i = 0; i < buffer.Count; i++)
         {
-            int j = rng.Next(i, buffer.Count);
+            var j = rng.Next(i, buffer.Count);
             yield return buffer[j];
 
             buffer[j] = buffer[i];

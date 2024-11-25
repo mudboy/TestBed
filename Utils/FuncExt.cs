@@ -15,7 +15,6 @@ public static class FuncExt
     
     public static Func<B, Func<A, C>> CurryR<A, B, C>(this Func<A, B, C> f) =>
         x => y => f(y, x);
-
     
     public static Func<T1, Func<T2, R>> Curry<T1, T2, R>(this Func<T1, T2, R> f) =>
         x => y => f(x, y);    

@@ -60,12 +60,11 @@ public static class State
         fs.SelectMany(parameter.Select);
 
     public static State<S, IEnumerable<B>> Traverse<S, A, B>(this IEnumerable<A> input, Func<A, State<S, B>> f) =>
-        input.Aggregate(Return<S, IEnumerable<B>>(Enumerable.Empty<B>()),
+        input.Aggregate(Return<S, IEnumerable<B>>([]),
             (acc, a) => acc.BiMap(f(a), (bs, b) => bs.Append(b)));
 
     public static State<S, IEnumerable<A>> Sequence<S, A>(IEnumerable<State<S, A>> actions) =>
         actions.Traverse(x => x);
-    
 }
 
 public static class Candy
