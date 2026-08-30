@@ -8,7 +8,7 @@ public static class EnumerableExtensions
 
     public static IEnumerable<R> Apply<T, R>(this IEnumerable<T> source, IEnumerable<Func<T, R>> fs)
     {
-        return from func in fs from v in source select func(v);
+        return fs.SelectMany(_ => source, (func, v) => func(v));
         //return fs.SelectMany(source.Select); // monadic style
     }    
     public static IEnumerable<R> ApplyM<T, R>(this IEnumerable<T> source, IEnumerable<Func<T, R>> fs)
@@ -72,31 +72,31 @@ public static class EnumerableExtensions
     }
 
     public static IEnumerable<C> Map2<A, B, C>(this IEnumerable<A> fa, IEnumerable<B> fb, Func<A, B, C> f) =>
-        fa.Zip(fb).Select(a => f(a.First, a.Second));
+        fa.Zip(fb, f);
     
-    public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> source)
-    {
-        return source.Shuffle(new Random());
-    }
-
-    public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> source, Random rng)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(rng);
-
-        return source.ShuffleIterator(rng);
-    }
-
-    private static IEnumerable<T> ShuffleIterator<T>(
-        this IEnumerable<T> source, Random rng)
-    {
-        var buffer = source.ToList();
-        for (var i = 0; i < buffer.Count; i++)
-        {
-            var j = rng.Next(i, buffer.Count);
-            yield return buffer[j];
-
-            buffer[j] = buffer[i];
-        }
-    }
+    // public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> source)
+    // {
+    //     return source.Shuffle(new Random());
+    // }
+    //
+    // public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> source, Random rng)
+    // {
+    //     ArgumentNullException.ThrowIfNull(source);
+    //     ArgumentNullException.ThrowIfNull(rng);
+    //
+    //     return source.ShuffleIterator(rng);
+    // }
+    //
+    // private static IEnumerable<T> ShuffleIterator<T>(
+    //     this IEnumerable<T> source, Random rng)
+    // {
+    //     var buffer = source.ToList();
+    //     for (var i = 0; i < buffer.Count; i++)
+    //     {
+    //         var j = rng.Next(i, buffer.Count);
+    //         yield return buffer[j];
+    //
+    //         buffer[j] = buffer[i];
+    //     }
+    // }
 }

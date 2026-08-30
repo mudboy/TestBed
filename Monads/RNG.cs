@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 
-namespace TestBed;
+namespace Monads;
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedType.Global
@@ -11,42 +11,43 @@ namespace TestBed;
 
 public interface IRng
 {
-    (IRng, int) NextInt();
+    (int, IRng) NextInt();
 }
 
 public static class Rng
 {
     private sealed record SimpleImpl(long Seed) : IRng
     {
-        public (IRng, int) NextInt()
+        public (int, IRng) NextInt()
         {
             var newSeed = (Seed * 0x5DEECE66DL + 0xBL) & 0xFFFFFFFFFFFFL;
             var nextRng = new SimpleImpl(newSeed);
             var v = (newSeed >>> 16);
             var n = (int)v;
-            return (nextRng, n);
+            return (n, nextRng);
         }
     }
 
     private sealed record PseudoImpl(int seed) : IRng
     {
+        public int seed { get; init; } = seed;
         private readonly Random _rng = new(seed);
-        public (IRng, int) NextInt() => (this, _rng.Next());
+        public (int, IRng) NextInt() => (_rng.Next(), this);
     }
     
     private sealed record SecureImpl : IRng
     {
-        public (IRng, int) NextInt()
+        public (int, IRng) NextInt()
         {
             var rg = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
-            return (this, rg);
+            return (rg, this);
         }
     }
 
     private sealed record ReallyDumbImpl : IRng
     {
         private int _next = 1;
-        public (IRng, int) NextInt() => (this, _next++);
+        public (int, IRng) NextInt() => (_next++, this);
     }
 
     public static IRng Simple(long seed) => new SimpleImpl(seed);
@@ -56,34 +57,34 @@ public static class Rng
     public static IRng ReallyDumb() => new ReallyDumbImpl();
     
     
-    public static (IRng, int) NonNegativeInt(this IRng rng)
+    public static (int, IRng) NonNegativeInt(this IRng rng)
     {
-        var (r, i) = rng.NextInt();
-        return (r, i < 0 ? -(i + 1) : i);
+        var (i, r) = rng.NextInt();
+        return (i < 0 ? -(i + 1) : i, r);
     }    
     
-    public static (IRng, int) NaturalNumber(this IRng rng)
+    public static (int, IRng) NaturalNumber(this IRng rng)
     {
-        var (r, i) = rng.NonNegativeInt();
-        return (r, 1 + i % (int.MaxValue - 1));
+        var (i, r) = rng.NonNegativeInt();
+        return (1 + i % (int.MaxValue - 1), r);
     }
     
     public static (B, IRng) Select<A, B>(this (A value, IRng next) rng, Func<A,B> f) =>
             (f(rng.value), rng.next);
     
-    public static (IRng, int) Int(this IRng rng) => 
+    public static (int, IRng) Int(this IRng rng) => 
         rng.NextInt();
     
-    public static (IRng, double) Double(this IRng rng)
+    public static (double, IRng) Double(this IRng rng)
     {
-        var (r,i) = rng.NonNegativeInt();
-        return (r, i * (1.0 / int.MaxValue));
+        var (i, r) = rng.NonNegativeInt();
+        return (i * (1.0 / int.MaxValue), r);
     }
 
-    public static (IRng, bool) Bool(this IRng rng) =>
+    public static (bool, IRng) Bool(this IRng rng) =>
         rng.NextInt() switch
         {
-            var (r2, i) => (r2, i % 2 == 0)
+            var (i, r2) => (i % 2 == 0, r2)
         };
 }
 

@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices.JavaScript;
+
 namespace Monads;
 
 
@@ -15,7 +17,7 @@ public static class IO
         }
         catch (Exception e)
         {
-            return new Left<Error, A>(new Error(e.Message));
+            return Either.Left(new Error(e.Message));
         }
     }
 

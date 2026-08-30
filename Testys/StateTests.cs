@@ -130,7 +130,7 @@ public sealed class StateTests
 
         var result = stateMachine.Run(initialState);
         
-        result.Value.Should().Be((9, 1));
+        result.value.Should().Be((9, 1));
     }
 
     private State<int, string> VowelExpander(string text) =>
@@ -138,7 +138,7 @@ public sealed class StateTests
         {
             const string vowels = "aeiouy";
             var expanded = text.SelectMany(c =>
-                vowels.Contains(c) ? Enumerable.Repeat(c, state) : new[] { c });
+                vowels.Contains(c) ? Enumerable.Repeat(c, state) : [c]);
 
             var newState = state + 1;
 

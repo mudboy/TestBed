@@ -22,8 +22,8 @@ public static class FuncExt
         x => (y, z) => f(x, y, z);
     
     public static Func<T1, Func<T2, T3, R>> CurryFirst<T1, T2, T3, R>
-        (this Func<T1, T2, T3, R> @this) => t1 => (t2, t3) => @this(t1, t2, t3);
-
+        (this Func<T1, T2, T3, R> @this) => t1 => (t2, t3) => @this(t1, t2, t3);    
+    
     public static Func<B, A, C> Flip<A, B, C>(this Func<A, B, C> f)
         => (b, a) => f(a, b);
 }
@@ -34,7 +34,7 @@ public static partial class Main
     {
         Func<string, string> exclaim = x => $"{x}!";
         Func<string, string> toUpperCase = x => x.ToUpper();
-        Func<string, string> back = x => String.Concat(x.Reverse());
+        Func<string, string> back = x => string.Concat(x.Reverse());
         
         Func<string, string> a = x => x + "A";
         Func<string, string> b = x => x + "B";

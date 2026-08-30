@@ -9,8 +9,30 @@ public delegate (A Value, S State) State<S, A>(S s);
 
 public static class State
 {
-    public static (A Value, S State) Run<S, A>(this State<S, A> underlying, S s) => 
-        underlying(s);
+
+    extension<A, S>(State<S, A> underlying)
+    {
+        public (A value, S State) Run(S s) => underlying(s);
+
+        public State<S, B> SelectMany<B>(Func<A, State<S, B>> f) =>
+            s =>
+            {
+                var (a, s1) = underlying(s);
+                return f(a)(s1);
+            };
+        
+        public State<S, C> SelectMany<B, C>(Func<A, State<S, B>> f,
+            Func<A, B, C> project) =>
+            underlying.SelectMany(a => f(a).Select(b => project(a, b)));
+
+        public State<S, C> Map2<B, C>(State<S, B> sb, Func<A, B, C> f) =>
+            from a in underlying
+            from b in sb
+            select f(a, b);
+    }
+    
+    // public static (A Value, S State) Run<S, A>(this State<S, A> underlying, S s) => 
+    //     underlying(s);
 
     public static State<S, A> Return<S, A>(A a) => 
         s => (a, s);
@@ -23,36 +45,13 @@ public static class State
 
     public static State<S, Unit> Modify<S>(Func<S, S> f) =>
         from s in Get<S>()
-        from _ in Set<S>(f(s))
+        from _ in Set(f(s))
         select Unit.Value;
 
+
     public static State<S, B> Select<S, A, B>(this State<S, A> underlying, Func<A, B> f) =>
-        s =>
-        {
-            var (a, s1) = underlying(s);
-            return (f(a), s1);
-        };
-    
-    public static State<S, B> SelectMany<S, A, B>(this State<S, A> underlying, Func<A, State<S, B>> f) =>
-        s => {
-            var (a, s1) = underlying(s);
-            return f(a)(s1);
-        };
+        underlying.SelectMany(a => Return<S,B>(f(a)));
 
-    public static State<S, C> SelectMany<S, A, B, C>(this State<S, A> underlying, Func<A, State<S, B>> f,
-        Func<A, B, C> project) =>
-        underlying.SelectMany(a => f(a).Select(b => project(a, b)));
-
-    public static State<S, C> Map2<S, A, B, C>(this State<S, A> underlying, State<S, B> sb, Func<A, B, C> f) =>
-        // from a in underlying
-        // from b in sb
-        // select f(a, b);
-        s =>
-        {
-            var (a, s1) = underlying(s);
-            var (b, s2) = sb(s1);
-            return (f(a, b), s2);
-        };
     
     //def apply[S, A](f: S => (A, S)): State[S, A] = f
     public static State<S, A> Apply<S, A>(State<S, A> f) => f;
@@ -73,12 +72,10 @@ public static class State
 
 public static class Candy
 {
-    public static State<Machine, (int Coins, int Candies)> SimulateMachine(params Input[] inputs)
-    {
-        return from _ in inputs.Traverse(i => State.Modify(Update(i)))
-               from s in State.Get<Machine>()
-               select (s.Coins, s.Candies);
-    }
+    public static State<Machine, (int Coins, int Candies)> SimulateMachine(params Input[] inputs) =>
+        from _ in inputs.Traverse(i => State.Modify(Update(i)))
+        from s in State.Get<Machine>()
+        select (s.Coins, s.Candies);
 
     public static Func<Machine, Machine> Update(Input i) => s =>
         (i, s) switch

@@ -1,5 +1,4 @@
 using System.Text;
-using TestBed;
 using Utils;
 using static Monads.Gen;
 using static Utils.EnumerableExtensions;
@@ -13,54 +12,28 @@ namespace Monads;
 // converted from
 // https://github.com/fpinscala/fpinscala/blob/second-edition/src/main/scala/fpinscala/answers/testing/Gen.scala
 
-public delegate (IRng, T) Gen<T>(IRng r);
+public delegate (T, IRng) Gen<T>(IRng r);
 
 public delegate Gen<T> SGen<T>(int n);
 
+
+public class IdxGen<A>(Func<IRng, (A, IRng)> f)
+{
+    public (A, IRng) this[IRng r] => f(r);
+
+    public static IdxGen<B> Return<B>(B value) => new(r => (value, r));
+    public static IdxGen<int> Int => new (r => r.NextInt());
+
+    public static implicit operator IdxGen<A>(A a) => Return(a);
+}
+
 public static class Gen
 {
-    public static A Run<A>(this Gen<A> gen, IRng r) => gen(r).Item2;
     public static Gen<int> Int => Rng.Int;
     public static Gen<int> NaturalInt => Rng.NaturalNumber;
     public static Gen<int> NonNegativeInt => Rng.NonNegativeInt;
     public static Gen<double> Double => Rng.Double;
     public static Gen<bool> Bool => Rng.Bool;
-
-    public static Gen<IEnumerable<A>> ListOfN<A>(int n, Gen<A> g) =>
-        Fill(n, g).Sequence().Select(x => x);
-
-    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, int n) => 
-        ListOfN(n, self).Select(l => l.ToList());
-
-    public static Gen<List<A>> ListOfN<A>(this Gen<A> self, Gen<int> size) => 
-        size.SelectMany(x => self.ListOfN(Math.Max(0, x)));
-    
-    public static SGen<List<A>> List<A>(this Gen<A> self) => 
-        n => ListOfN(n, self).Select(l => l.ToList());
-    
-    public static SGen<List<A>> NonEmptyList<A>(this Gen<A> self) => 
-        n => ListOfN(Math.Max(n, 1), self).Select(l => l.ToList());
-    
-    public static SGen<A> UnSized<A>(this Gen<A> self) => 
-        _ => self;
-    
-    public static Gen<IEnumerable<A>> NonEmptyEnumerable<A>(this Gen<A> g) =>
-        Choose(1, 127).SelectMany(i => ListOfN(i, g));
-
-    public static Gen<R> Select<T, R>(this Gen<T> self, Func<T, R> f) =>
-        self.SelectMany(a => Return(f(a)));
-    
-
-    public static Gen<R> SelectMany<T, R>(this Gen<T> self, Func<T, Gen<R>> f) =>
-        r =>
-        {
-            var (rng, v) = self(r);
-            return f(v)(rng);
-        };
-
-    public static Gen<C> SelectMany<A, B, C>(this Gen<A> self, Func<A, Gen<B>> fromFirst, Func<A, B, C> project) =>
-        self.SelectMany(x => fromFirst(x).Select(y => project(x, y))); 
-
     
     public static Gen<char> Digit => 
         Choose(48, 58).Select(x => (char)x);
@@ -71,12 +44,51 @@ public static class Gen
             .Select(x => (char)x);
 
     public static Gen<char> AlphaNumeric => Char.Union(Digit);
+
+    public static Gen<IEnumerable<A>> ListOfN<A>(int n, Gen<A> g) =>
+        Fill(n, g).Sequence();
+
+    extension<A>(Gen<A> self)
+    {
+        public Gen<List<A>> ListOfN(int n) => 
+            ListOfN(n, self).Select(l => l.ToList());
+
+        public Gen<List<A>> ListOfN(Gen<int> size) => 
+            size.SelectMany(x => self.ListOfN(Math.Max(0, x)));
+
+        public SGen<List<A>> List() => 
+            n => ListOfN(n, self).Select(l => l.ToList());
+
+        public SGen<List<A>> NonEmptyList() => 
+            n => ListOfN(Math.Max(n, 1), self).Select(l => l.ToList());
+
+        public SGen<A> UnSized() => 
+            _ => self;
+
+        public Gen<IEnumerable<A>> NonEmptyEnumerable() =>
+            Choose(1, 127).SelectMany(i => ListOfN(i, self));
+
+        public Gen<R> Select<R>(Func<A, R> f) =>
+            self.SelectMany(a => Return(f(a)));
+
+        public Gen<R> SelectMany<R>(Func<A, Gen<R>> f) =>
+            r =>
+            {
+                var (v, rng) = self(r);
+                return f(v)(rng);
+            };
+
+        public Gen<C> SelectMany<B, C>(Func<A, Gen<B>> fromFirst, Func<A, B, C> project) =>
+            self.SelectMany(x => fromFirst(x).Select(y => project(x, y)));
+        
+        public Gen<A> Union(Gen<A> b) =>
+            Bool.SelectMany(x => x ? self : b);
+    }
     
     public static Gen<T> Return<T>(T value) => 
-        rng => (rng, value);
+        rng => (value, rng);
     
-    public static Gen<A> Union<A>(this Gen<A> a, Gen<A> b) =>
-        Bool.SelectMany(x => x ? a : b);
+
     
     public static Gen<A> Weighted<A>((Gen<A> gen, double weight) g1, (Gen<A> gen, double weight) g2)
     {
@@ -104,71 +116,92 @@ public static class Gen
                 return selection.gen!;
             });
 
-    // map(select) can be defined in terms of BiMap(map2) and Unit
-    public static Gen<B> Map<A, B>(this Gen<A> ga, Func<A, B> f) =>
-        ga.Map2(Return<B>(default!), (a, _) => f(a));
+    public static Gen<A> Weighted2<A>(params (A a, int weight)[] items) => 
+        Weighted2(items.Select(tuple => (Return(tuple.a), tuple.weight)).ToArray());
     
-    // BiMap(map2) can be defined directly for this type and is applicative
-    public static Gen<C> Map2<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> f) =>
-        r =>
-        {
-            var (rng1, a) = ga(r);
-            var (rng2, b) = gb(rng1);
-            return (rng2, f(a,b));
-        };
+    // map(select) can be defined in terms of BiMap(map2) and Unit
+    extension<A>(Gen<A> ga)
+    {
+        public Gen<B> Map<B>(Func<A, B> f) =>
+            ga.Map2(Return<B>(default!), (a, _) => f(a));
 
-    // or it can be defined with selectMany/bind (and this is general for all monads)
-    public static Gen<C> BiMapM<A, B, C>(this Gen<A> ga, Gen<B> gb, Func<A, B, C> fc) =>
-        ga.SelectMany(a => gb.Select(b => fc(a, b)));
+        // BiMap(map2) can be defined directly for this type and is applicative
+        public Gen<C> Map2<B, C>(Gen<B> gb, Func<A, B, C> f) =>
+            r =>
+            {
+                var (a, rng1) = ga(r);
+                var (b, rng2) = gb(rng1);
+                return (f(a,b), rng2);
+            };
 
-    /// <summary>
-    /// Convert an IEnumerable{Gen{A}} to Gen{IEnumerable{A}} 
-    /// </summary>
+        // or it can be defined with selectMany/bind (and this is general for all monads)
+        public Gen<C> BiMapM<B, C>(Gen<B> gb, Func<A, B, C> fc) =>
+            ga.SelectMany(a => gb.Select(b => fc(a, b)));
+
+        public A Run(IRng r) => ga(r).Item1;
+    }
+    
+    
     /// <param name="actions">the list of Gen{A}s</param>
     /// <typeparam name="A">the type contained in the Gen{A}</typeparam>
-    /// <returns></returns>
-    public static Gen<IEnumerable<A>> Sequence<A>(this IEnumerable<Gen<A>> actions) =>
-        actions.Traverse(x => x);
+    extension<A>(IEnumerable<Gen<A>> actions)
+    {
+        /// <summary>
+        /// Convert an IEnumerable[Gen[A]] to Gen[IEnumerable[A]] 
+        /// </summary>
+        /// <returns></returns>
+        public Gen<IEnumerable<A>> Sequence() =>
+            actions.Traverse(x => x);
+
+        public Gen<IEnumerable<A>> Sequence2() => 
+            actions.Aggregate(
+                Return(Nil<A>()),
+                (acc, a) => 
+                    acc.SelectMany(xs => a.Select(xs.Append)));
+
+        public Gen<IEnumerable<A>> Sequence3() =>
+            actions.Aggregate(
+                Return(Nil<A>()), 
+                (acc, a) => 
+                    acc.Map2(a, (xs, x) => xs.Append(x)));
+
+        public Gen<IEnumerable<A>> Sequence4() =>
+            actions.Aggregate(
+                Return(Nil<A>()),
+                (acc, a) =>
+                    Return(Append<A>()) 
+                        .Apply(acc)
+                        .Apply(a));
+    }
 
     // Sequence can be defined as a SelectMany then select this version is monadic i.e. each step depended on the last
-    public static Gen<IEnumerable<A>> Sequence2<A>(this IEnumerable<Gen<A>> actions) => 
-        actions.Aggregate(Return(Nil<A>()), (acc, a) => acc.SelectMany(xs => a.Select(x => xs.Append(x))));
-
-    public static Gen<IEnumerable<A>> Sequence3<A>(this IEnumerable<Gen<A>> actions) =>
-        actions.Aggregate(Return(Nil<A>()), (acc, a) => acc.Map2(a, (xs, x) => xs.Append(x)));
 
     // Here we use and actual lifted function and apply method
-    public static Gen<IEnumerable<A>> Sequence4<A>(this IEnumerable<Gen<A>> actions) =>
-        actions.Aggregate(
-            Return(Nil<A>()),
-            (acc, a) =>
-                Return(Append<A>())
-                    .Apply(acc)
-                    .Apply(a));
-    
+
     public static async Task<S> Fold<A, S>(this Task<A> task, S initial, Func<S, A, S> folder)
     {
         var val = await task;
         return folder(initial, val);
     }
     
-    
     private static Func<IEnumerable<T>, T, IEnumerable<T>> Append<T>()
         => (ts, t) => ts.Append(t);
     
-    
     // direct implementation, like sequence but with the added function call.
-    public static Gen<IEnumerable<B>> Traverse<A,B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
-        las.Aggregate(
-            Return(Nil<B>()), 
-            (acc, a) => 
-                f(a).Map2(acc, (b, xs) => xs.Append(b)));
+    extension<A>(IEnumerable<A> las)
+    {
+        public Gen<IEnumerable<B>> Traverse<B>(Func<A, Gen<B>> f) =>
+            las.Aggregate(
+                Return(Nil<B>()), 
+                (acc, a) => 
+                    f(a).Map2(acc, (b, xs) => xs.Append(b)));
+
+        public Gen<IEnumerable<B>> Traverse2<B>(Func<A, Gen<B>> f) =>
+            las.Select(f).Sequence3();
+    }
 
     // or can be just as simple as a map then sequence
-    public static Gen<IEnumerable<B>> Traverse2<A, B>(this IEnumerable<A> las, Func<A, Gen<B>> f) =>
-        las.Select(f).Sequence3();
-    
-    
+
     public static Gen<Func<T2, R>> Apply<T1, T2, R>(this Gen<Func<T1, T2, R>> optF, Gen<T1> optT) 
         => optF.Select(FuncExt.Curry).Apply(optT);      
     
@@ -243,23 +276,23 @@ public static class Gen
         return rng =>
         {
             var builder = new StringBuilder(pattern.Length);
-            var seed = (rng, builder);
+            var seed = (builder, rng);
             var res = pattern.Aggregate(seed, (acc, c) =>
             {
                 var v = c switch
                 {
                     'A' => Char(acc.rng),
                     '9' => Digit(acc.rng),
-                    _ => (acc.rng, c)
+                    _ => (c, acc.rng)
                 };
-                return (v.Item1, acc.builder.Append(v.Item2));
+                return (acc.builder.Append(v.Item2), v.Item2);
             });
 
-            return (res.rng, res.builder.ToString());
+            return (res.builder.ToString(), res.rng);
         };
     }
 
-    public static Gen<int> Choose(int start, int stopExclusive) =>
+    public static Gen<int>  Choose(int start, int stopExclusive) =>
         Select(Rng.NonNegativeInt, n => start + n % (stopExclusive - start));
 
     public static readonly Gen<string> Postcode = 
@@ -271,12 +304,16 @@ public static class Gen
 
 public static class SGen
 {
-    public static SGen<B> Select<A, B>(this SGen<A> self, Func<A, B> f) => n => self(n).Select(f);
+    extension<A>(SGen<A> self)
+    {
+        public SGen<B> Select<B>(Func<A, B> f) => n => self(n).Select(f);
 
-    public static SGen<B> SelectMany<A, B>(this SGen<A> self, Func<A, SGen<B>> f) =>
-        n => self(n).SelectMany(x => f(x)(n));
+        public SGen<B> SelectMany<B>(Func<A, SGen<B>> f) =>
+            n => self(n).SelectMany(x => f(x)(n));
 
-    public static Gen<A> Apply<A>(this SGen<A> self, int n) => self(n);
+        public Gen<A> Apply(int n) => self(n);
+    }
+
     public static SGen<A> Apply<A>(Func<int, Gen<A>> f) => n => f(n);
 }
 
@@ -310,7 +347,7 @@ public static partial class Main
         string QueAfter(string s) => s + "-q";
         string BothEssAndQue(string s) => EssBefore(QueAfter(s));
 
-        var taintingFunctions = Gen.OneOf(EssBefore, QueAfter, BothEssAndQue);
+        var taintingFunctions = OneOf(EssBefore, QueAfter, BothEssAndQue);
         var taintedPostcodes = taintingFunctions.Apply(Postcode);
 
         var listOfTaintedPostcodes = ListOfN(25, taintedPostcodes).Run(r);

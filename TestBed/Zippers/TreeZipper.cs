@@ -1,28 +1,26 @@
 namespace TestBed.Zippers;
 
-public abstract record Tree<A>()
+public abstract record Tree<A>
 {
     public static implicit operator Tree<A>(EmptyTree _) => new Empty<A>();
 
     public static implicit operator Tree<A>((A value, Tree<A> left, Tree<A> right) p) =>
         new Node<A>(p.value, p.left, p.right);
 
-    public abstract B Match<B>(Func<A, Tree<A>, Tree<A>, B> whenNode, Func<B> whenEmpty);
-};
+    public abstract B Match<B>(Func<A, Tree<A>, Tree<A>, B> node, Func<B> empty);
+}
 
 internal sealed record Empty<A> : Tree<A>
 {
-    public override B Match<B>(Func<A, Tree<A>, Tree<A>, B> whenNode, Func<B> whenEmpty)
-    {
-        return whenEmpty();
-    }
+    public override B Match<B>(Func<A, Tree<A>, Tree<A>, B> node, Func<B> empty) => 
+        empty();
 }
 
-internal sealed record Node<A>(A value, Tree<A> left, Tree<A> right) : Tree<A>
+internal sealed record Node<A>(A Value, Tree<A> Left, Tree<A> Right) : Tree<A>
 {
-    public override B Match<B>(Func<A, Tree<A>, Tree<A>, B> whenNode, Func<B> whenEmpty)
+    public override B Match<B>(Func<A, Tree<A>, Tree<A>, B> node, Func<B> empty)
     {
-        return whenNode(value, left, right);
+        return node(Value, Left, Right);
     }
 }
 
@@ -36,89 +34,80 @@ public static class Tree
     
 }
 
-public abstract record Crumb<T>
-{
-    public abstract R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right);
-}
-public sealed record CrumbLeft<T>(T x, Tree<T> r) : Crumb<T>
-{
-    public override R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right) => left(x, r);
-}
+public abstract record Crumb;
 
-public sealed record CrumbRight<T>(T x, Tree<T> l) : Crumb<T>
-{
-    public override R Match<R>(Func<T, Tree<T>, R> left, Func<T, Tree<T>, R> right)
-    {
-        return right(x, l);
-    }
-}
+public sealed record CrumbLeft<T>(T Node, Tree<T> RightTree) : Crumb;
 
-public record Zipper<A, B>(A focus, List<B> breadcrumbs);
+public sealed record CrumbRight<T>(T Node, Tree<T> LeftTree) : Crumb;
 
-public sealed record TZip<A>(Tree<A> focus, List<Crumb<A>> crumbs) :
-    Zipper<Tree<A>, Crumb<A>>(focus, crumbs)
+public record Zipper;
+
+public sealed record TreeZipper<A>(Tree<A> Focus, List<Crumb> Crumbs) : Zipper
 {
-    public static implicit operator TZip<A>((Tree<A> focus, List<Crumb<A>> crumbs) p) => new(p.focus, p.crumbs);
+    public static implicit operator TreeZipper<A>((Tree<A> focus, List<Crumb> crumbs) p) => new(p.focus, p.crumbs);
 }
 public static class TreeZipper
 {
-    public static TZip<A> Create<A>() => new(Tree.Empty, []);
-    public static TZip<A> Create<A>(Tree<A> tree) => new (tree, []);
+    public static TreeZipper<A> Create<A>() => new(Tree.Empty, []);
+    public static TreeZipper<A> Create<A>(Tree<A> tree) => new (tree, []);
     
-    private static List<Crumb<X>> Add<X>(List<Crumb<X>> ls, Crumb<X> x)
+    private static List<Crumb> Add(List<Crumb> ls, Crumb x)
     {
         return ls.Prepend(x).ToList();
     }
     
-    public static TZip<A>? GoLeft<A>(TZip<A> z)
+    public static TreeZipper<A>? GoLeft<A>(TreeZipper<A> z)
     {
         return z switch
         {
             (Empty<A>, _) => null,
             (Node<A> (var x, var l, var r), var bs) => 
-                new TZip<A>(l, Add(bs, new CrumbLeft<A>(x, r))),
-            _ => throw new ArgumentOutOfRangeException()
+                new TreeZipper<A>(l, Add(bs, new CrumbLeft<A>(x, r))),
+            _ => throw new InvalidOperationException()
         };
     }
     
-    public static TZip<A>? GoRight<A>(TZip<A> z)
+    public static TreeZipper<A>? GoRight<A>(TreeZipper<A> z)
     {
         return z switch
         {
             (Empty<A>, _) => null,
             (Node<A> (var x, var l, var r), var bs) => 
-                new TZip<A>(r, Add(bs, new CrumbRight<A>(x, l))),
-            _ => throw new ArgumentOutOfRangeException()
+                new TreeZipper<A>(r, Add(bs, new CrumbRight<A>(x, l))),
+            _ => throw new InvalidOperationException()
         };
     }
 
-    public static TZip<A>? Modify<A>(TZip<A> z, Func<A, A> f)
+    public static TreeZipper<A>? Modify<A>(TreeZipper<A> z, Func<A, A> f)
     {
         return z switch
         {
             (Empty<A>, _) => null,
-            (Node<A> t, var bs) => new TZip<A>(Tree.Node(f(t.value), t.left, t.right), bs),
-            _ => throw new ArgumentOutOfRangeException(nameof(z), z, null)
+            (Node<A> t, var bs) => new TreeZipper<A>(Tree.Node(f(t.Value), t.Left, t.Right), bs),
+            _ => throw new InvalidOperationException()
         };
     }
 
-    public static TZip<A>? Topmost<A>(TZip<A> z)
+    public static TreeZipper<A>? Topmost<A>(TreeZipper<A> z)
     {
         var g = GoUp(z);
         return g is null ? z : Topmost(g);
     }
 
-    public static TZip<A>? GoUp<A>(TZip<A> z)
+    public static TreeZipper<A>? GoUp<A>(TreeZipper<A> z)
     {
         return z switch
         {
             (Empty<A>, _) => null,
             (Node<A>, []) => null,
-            (Node<A> t,  [var b, .. var bs]) =>
-                b.Match(
-                    left: (x, r) => (Tree.Node(x, t, r), bs),
-                    right: (x, l) => (Tree.Node(x, l, t), bs)),
-            _ => throw new ArgumentOutOfRangeException(nameof(z), z, null)
+            (Node<A> t, [var b, .. var bs]) =>
+                b switch
+                {
+                    CrumbLeft<A>(var x, var r) => (Tree.Node(x, t, r), bs),
+                    CrumbRight<A>(var x, var l) => (Tree.Node(x, l, t), bs),
+                    _ => throw new InvalidOperationException()
+                },
+            _ => throw new InvalidOperationException()
         };
     } 
 }

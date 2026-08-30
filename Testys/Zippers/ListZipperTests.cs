@@ -116,7 +116,7 @@ public sealed class ListZipperTests
 public static class Ext
 {
 
-    public static TZip<A>? Sequence<A>(TZip<A> initial, params Func<TZip<A>, TZip<A>?>[] fs)
+    public static TreeZipper<A>? Sequence<A>(TreeZipper<A> initial, params Func<TreeZipper<A>, TreeZipper<A>?>[] fs)
     {
         var input = initial;
         foreach (var f in fs)
@@ -128,8 +128,8 @@ public static class Ext
 
         return input;
     }
-    public static string? GetValue(this TZip<string>? data)
+    public static string? GetValue(this TreeZipper<string>? data)
     {
-        return data?.focus.Match((s, _, _) => s, () => "#empty#");
+        return data?.Focus.Match((s, _, _) => s, () => "#empty#");
     }
 }

@@ -1,5 +1,3 @@
-using TestBed.HigherKinds;
-using Utils;
 using static TestBed.Applicatives.Suit;
 using static TestBed.Applicatives.Face;
 
@@ -10,8 +8,8 @@ public delegate (Deck, IEnumerable<Card>) Deal(Deck d);
 // from https://blog.ploeh.dk/2018/10/08/full-deck/
 public static class Applicatives
 {
-    public static List<Suit> allSuits = new() {Hearts, Clubs, Spades, Diamonds};
-    public static List<Face> allFaces = new() {Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace};
+    private static readonly List<Suit> allSuits = [Hearts, Clubs, Spades, Diamonds];
+    private static readonly List<Face> allFaces = [Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace];
 
     public static void Main()
     {
@@ -48,17 +46,18 @@ public readonly record struct Player(Hand Hand)
 public readonly record struct Hand(IEnumerable<Card> Cards)
 {
     public static Hand From(params Card[] cards) => new Hand(cards);
-    
-    public (int fullValue, int lowValue) Value => Cards.Aggregate((0,0),(acc, c) => c.Face switch
-    {
-        Ace => ((int)c.Face + acc.Item1, acc.Item1 + 1),
-        _ => ((int)c.Face % 11 + acc.Item1, 0)
-    });
+
+    public (int fullValue, int lowValue) Value => Cards.Aggregate((0, 0), (acc, card) =>
+        card.Face switch
+        {
+            Ace => ((int)card.Face + acc.Item1, acc.Item1 + 1),
+            _ => ((int)card.Face % 11 + acc.Item1, 0)
+        });
 
     public override string ToString() => string.Join(", ", Cards.Select(x => x.ToString()));
     
-    public static Hand AddCards(Hand hand, IEnumerable<Card> cards) => new(hand.Cards.Concat(cards));
-    public static Hand AddCards(Hand hand, params Card[] cards) => new(hand.Cards.Concat(cards));
+    //public static Hand AddCards(Hand hand, IEnumerable<Card> cards) => new(hand.Cards.Concat(cards));
+    public static Hand AddCards(Hand hand, params IEnumerable<Card> cards) => new(hand.Cards.Concat(cards));
 }
 
 public readonly record struct Deck(IEnumerable<Card> Cards)

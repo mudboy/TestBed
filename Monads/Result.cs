@@ -22,15 +22,7 @@ public abstract class Result<A> : IEquatable<Result<A>>
     
     public static Result<A> operator >> (Result<A> lhs, Func<A, Result<A>> rhs) => lhs.SelectMany(rhs);
     
-    public bool Equals(Result<A>? other)
-    {
-        if (other is null) return false;
-        if (this is Success<A> a && other is Success<A> b)
-            return a.Value.Equals(b.Value);
-        if (this is Failure<A> fa && other is Failure<A> fb)
-            return fa.Error.Equals(fb.Error);
-        return false;
-    }
+    public bool Equals(Result<A>? other) => IsEqualTo(other);
 
     protected abstract bool IsEqualTo(Result<A>? other);
 

@@ -1,3 +1,4 @@
+using System.Numerics;
 using Utils;
 using static Monads.Option;
 
@@ -28,7 +29,7 @@ public abstract record Option<A>
 
     internal static Option<A> CreateSome(A value) => new SomeValue(value);
     internal static Option<A> None() => new NoValue();
-    
+
     public Option<B> SelectMany<B>(Func<A, Option<B>> bind) => Match(bind, Option<B>.None);
 
     public Option<C> SelectMany<B, C>(Func<A, Option<B>> bind, Func<A, B, C> project) => 
@@ -57,29 +58,66 @@ public static class Option
 
 public static class OptionExtensions
 {
+    extension<A, B>(Option<A>)
+    {
+        public static Option<B> operator >>> (Option<A> a, Func<A, Option<B>> f) => a.SelectMany(f);
+
+        public static Option<B> operator >> (Option<A> a, Func<A, B> f) => a.Select(f);
+
+    }
+    
+    extension<A, B, C, D>(Func<A, B, C, D>)
+    {
+        public static Option<Func<B, C, D>> operator %(Func<A, B, C, D> f, Option<A> a) => a.Select(x => f.Curry()(x));
+    }
+    
+    
+    extension<A, B, C>(Func<A, B, C>)
+    {
+        public static Func<A, Func<B, C>> operator !(Func<A, B, C> f) => f.Curry();
+        public static Option<Func<B, C>> operator %(Func<A, B, C> f, Option<A> a) => a.Select(x => f.Curry()(x));
+    }
+    
+    extension<A, B>(Option<Func<A, B>>)
+    {
+        public static Option<B> operator *(Option<Func<A, B>> f, Option<A> a) => f.Apply(a);
+    }
+    
+    extension<A, B, C>(Option<Func<A, B, C>>)
+    {
+        public static Option<Func<B,C>> operator *(Option<Func<A, B, C>> f, Option<A> a) => f.Apply(a);
+    }
+    
     public static Option<A> ToOption<A>(this A? value) => value is not null ? Some(value) : None;
      
     // primitive definition of apply not using map2
-    public static Option<B> Apply<A, B>(this Option<Func<A, B>> optF, Option<A> optA) =>
-        optF.Match(
-            some: f => 
-                optA.Match(
-                    some: a => Some(f(a)), 
-                    none: () => None), 
-            none: () => None);
+    extension<A, B>(Option<Func<A, B>> optF)
+    {
+        public Option<B> Apply(Option<A> optA) =>
+            optF.Match(
+                some: f => 
+                    optA.Match(
+                        some: a => Some(f(a)), 
+                        none: () => None), 
+                none: () => None);
+
+        public Option<B> ApplyViaMap2(Option<A> optA) =>
+            optF.Map2(optA, (f, a) => f(a));
+    }
 
 
     // apply using map2
-    public static Option<B> ApplyViaMap2<A, B>(this Option<Func<A, B>> optF, Option<A> optA) =>
-        optF.Map2(optA, (f, a) => f(a));
 
     // apply right
-    public static Option<Func<A, C>> ApplyR<A, B, C>(this Option<Func<A, B, C>> optF, Option<B> optB) =>
-        optF.Select(FuncExt.CurryR).Apply(optB);
+    extension<A, B, C>(Option<Func<A, B, C>> optF)
+    {
+        public Option<Func<A, C>> ApplyR(Option<B> optB) =>
+            optF.Select(FuncExt.CurryR).Apply(optB);
 
-    public static Option<Func<T2, R>> Apply<T1, T2, R>(this Option<Func<T1, T2, R>> optF, Option<T1> optT) 
-        => optF.Select(FuncExt.Curry).Apply(optT);    
-    
+        public Option<Func<B, C>> Apply(Option<A> optT) 
+            => optF.Select(FuncExt.Curry).Apply(optT);
+    }
+
     public static Option<Func<T2, T3, R>> Apply<T1, T2, T3, R>(this Option<Func<T1, T2, T3, R>> optF, Option<T1> optT) 
         => Apply(optF.Select(FuncExt.Curry), optT);
     
@@ -107,32 +145,41 @@ public static class OptionExtensions
         => (ts, t) => ts.Append(t);
 
     // this is the applicative version using apply
-    public static Option<IEnumerable<B>> TraverseA<A, B>(this IEnumerable<A> list, Func<A, Option<B>> f)
-        => list.Aggregate(
-            seed: Some(Enumerable.Empty<B>()),
-            func: (optBs, a) =>
-                Some(Append<B>())
-                    .Apply(optBs)
-                    .Apply(f(a))
-        );
+    extension<A, B>(IEnumerable<A> list)
+    {
+        public Option<IEnumerable<B>> TraverseA(Func<A, Option<B>> f) => 
+            list.Aggregate(
+                seed: Some(Enumerable.Empty<B>()),
+                func: (optBs, a) =>
+                    Some(Append<B>())
+                        .Apply(optBs)
+                        .Apply(f(a))
+            );
+
+        public Option<IEnumerable<B>> Traverse2(Func<A, Option<B>> f) =>
+            list.Aggregate(
+                seed: Some(Enumerable.Empty<B>()),
+                func: (acc, a) =>
+                    f(a).Map2(acc, (b, bs) => bs.Append(b))
+            );
+
+        public Option<IEnumerable<B>> TraverseA2(Func<A, Option<B>> f) => 
+            list.Aggregate(
+                seed: Some(Enumerable.Empty<B>()), 
+                func: (acc, x) => 
+                    f(x).Map2(acc, (b, xs) => xs.Append(b)));
+
+        public Option<IEnumerable<B>> Traverse(Func<A, Option<B>> f) =>
+            list.TraverseA(f);
+
+        public static IEnumerable<B> operator >> (IEnumerable<A> a, Func<A, B> f) => a.Select(f);
+
+        public static Option<IEnumerable<B>> operator <<(IEnumerable<A> a, Func<A, Option<B>> f) => a.Traverse(f);
+    }
     
     // Traverse can also be defined with Map2
-    public static Option<IEnumerable<B>> Traverse2<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f) =>
-        ts.Aggregate(
-            seed: Some(Enumerable.Empty<B>()),
-            func: (acc, a) =>
-                f(a).Map2(acc, (b, bs) => bs.Append(b))
-        );
-
-    public static Option<IEnumerable<B>> TraverseA2<A, B>(this IEnumerable<A> list, Func<A, Option<B>> f)
-        => list.Aggregate(
-            seed: Some(Enumerable.Empty<B>()), 
-            func: (acc, x) => 
-                f(x).Map2(acc, (b, xs) => xs.Append(b)));
 
     // default to the applicative version
-    public static Option<IEnumerable<B>> Traverse<A, B>(this IEnumerable<A> ts, Func<A, Option<B>> f)
-        => TraverseA(ts, f);
 
     // Sequence can flip the type on collections of M[A]
     // so List[M[A]] -> M[List[A]]
@@ -162,7 +209,8 @@ public static class OptionExtensions
     
     // Map2 can also be defined with the primitive apply and unit
     public static Option<C> Map2WithApply<A, B, C>(this Option<A> oa, Option<B> ob, Func<A, B, C> f) =>
-        Some(f).Apply(oa).Apply(ob);
+        //Some(f).Apply(oa).Apply(ob);
+        f % oa * ob;
     
 
     // join can be defined be bind
@@ -181,30 +229,25 @@ public static class OptionExtensions
 
 public static partial class Main
 {
-    public static Option<double> DoubleParse(string value) =>
-        Double.TryParse(value, out var result) ? Some(result) : None;
 
-    public static string StringTrim(string value) => value.Trim();
     
     public static void OptionExamples()
     {
-        var input = Console.ReadLine();
+        var input = "";
 
         // when you map(select) with a world crossing function a -> M a
         // you get a list of the container type
         // which is usually not what you want
         // i.e. [a] map a -> M a = [M a] and not M [a] 
-        input.Split(',')
-            .Select(StringTrim)
-            .Select(DoubleParse) // IEnumerable<Option<double>> 😒
-            .Print("Uh what? ");
+        (input.Split(',') >> StringEx.Trim >> DoubleEx.MaybeParse // IEnumerable<Option<double>> 😒
+            ).Print("Uh what? ");
 
         // so use Traverse to flip the order of the types
+        // Traverse is usually applicative so will combine "errors" if M supports that
         input.Split(',')
-            .Select(StringTrim)
-            .Traverse(DoubleParse) // Option<IEnumerable<double>> 😍
+            .Select(StringEx.Trim)
+            .Traverse(DoubleEx.MaybeParse) // Option<IEnumerable<double>> 😍
             .Match(x => x.Print("Numbers are "), () => Console.WriteLine($"input {input} is not valid")); 
-        
         
         var dobl = (int x) => x * 2;
 
@@ -220,7 +263,9 @@ public static partial class Main
         var mul3 = (int x, int y, int z) => x * y * z;
         var remainder = (int dividend, int divisor) => dividend % divisor;
 
-        var x = Some(2).Select(mul2.Curry()).Apply(Some(3));
+        var xxx = DoProcessing2;
+
+        var x = Some(2).Select(!xxx).Apply(Some(3));
         x.Match(i => Console.WriteLine($"i is {i}"), () => Console.WriteLine("None"));
         Some(mul2)
             .Apply(Some(2))
@@ -230,11 +275,115 @@ public static partial class Main
             .Apply(Some(1))
             .Apply(Some(3))
             .Apply(Some(5));
+        
+        //with cryptic symbols
+        var cs = mul3 % Some(1) * Some(2) * Some(3);
 
         var twoRemainder = Some(remainder)
             .ApplyR(Some(2));
 
         var res = twoRemainder.Apply(Some(4));
 
+        var xx = Some(3);
+        
+        var rr = xx >> (xy => xy + 2) >>> DoProcessing;
+
+        var res1 = mul2 % Some(3) * Some(3);
+
+        res1.Select(ConsoleEx.WriteLine);
+        
+        
+        var x1 = Consume([1,2,3], 1);
+        Console.WriteLine(x1.ToList());
+        var x2 = Consume([1,2,3], 2);
+        Console.WriteLine(x2.ToList());
+        var x3 = Consume([1,2,3], 3);
+        Console.WriteLine(x3.ToList());
+        var x4 = Consume([1,2,3], 4);
+        Console.WriteLine(x4.ToList());
+
+        string workDir = "work";
+        var tempPath = Path.GetTempPath() / workDir / "file.jpg";
+        var fi = new FileInfo(tempPath);
+
+        var di = new DirectoryInfo(Path.GetTempPath());
+        
+        var nn = fi.FullName;
+            
+        Console.WriteLine(tempPath);
+    }
+
+    public static Option<string> DoProcessing(int a) => Some("");
+    public static Option<string> DoProcessing2(int a, int b) => Some("");
+
+    public static IEnumerable<T> Consume<T>(
+        this IEnumerable<T> source, T quantity) 
+        where T : IComparisonOperators<T, T, bool>, INumberBase<T>
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegative(quantity);
+
+        return ConsumeIterator(source, quantity);
+    }
+
+    private static IEnumerable<T> ConsumeIterator<T>(IEnumerable<T> source, T quantity)
+        where T : IAdditiveIdentity<T, T>,
+        IAdditionOperators<T, T, T>,
+        IComparisonOperators<T, T, bool>
+    {
+        var acc = T.AdditiveIdentity;
+        foreach (var i in source)
+        {
+            if (quantity <= acc)
+                yield return i;
+            acc += i;
+        }
+    }
+}
+
+public static class DoubleEx
+{
+    extension(double)
+    {
+        public static Option<double> MaybeParse(string value) =>
+            double.TryParse(value, out var result) ? Some(result) : None;
+    }
+}
+
+public static class StringEx
+{
+    extension(string value)
+    {
+        public string Trim() => value.Trim();
+    }
+}
+
+public static class ConsoleEx
+{
+    extension(Console)
+    {
+        public static Unit WriteLine(int x)
+        {
+            Console.WriteLine(x);
+            return Unit.Value;
+        }
+    }
+}
+
+public static class PathEx
+{
+    extension(string)
+    {
+        public static string operator /(string a, string b) => Path.Combine(a, b);
+    }
+
+    extension(Uri)
+    {
+        public static UriBuilder operator /(Uri a, string b)
+        {
+            var bb = new UriBuilder(a);
+            bb.Path += b;
+            return bb;
+        }
     }
 }
