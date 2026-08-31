@@ -28,6 +28,21 @@ public abstract class ExecutorService : IDisposable
 {
     public abstract IFuture<A> Submit<A>(Func<A> callable);
 
+    /// <summary>
+    /// java.util.concurrent.Executor.execute — fire and forget, no future allocated.
+    /// The non-blocking Par leans on this heavily: every continuation is scheduled,
+    /// never awaited.
+    /// </summary>
+    public abstract void Execute(Action command);
+
+    /// <summary>
+    /// Where an exception escaping an <see cref="Execute"/>d action ends up. Java hands
+    /// these to the thread's UncaughtExceptionHandler; there is nowhere else for them to
+    /// go, since fire-and-forget work has no future to capture them.
+    /// </summary>
+    public static Action<Exception> UnhandledException { get; set; } =
+        e => Console.Error.WriteLine($"[ExecutorService] unhandled: {e}");
+
     public virtual void Dispose() => GC.SuppressFinalize(this);
 
     public static ExecutorService FixedThreadPool(int nThreads) => new FixedThreadPool(nThreads);
@@ -53,7 +68,19 @@ file sealed class FixedThreadPool : ExecutorService
 
     private void Worker()
     {
-        foreach (var work in queue.GetConsumingEnumerable()) work();
+        foreach (var work in queue.GetConsumingEnumerable())
+        {
+            // Submitted work captures its own exceptions into the future; only Execute'd
+            // work can throw here, and — as in Java — that must not kill the worker.
+            try
+            {
+                work();
+            }
+            catch (Exception e)
+            {
+                UnhandledException(e);
+            }
+        }
     }
 
     public override IFuture<A> Submit<A>(Func<A> callable)
@@ -62,6 +89,8 @@ file sealed class FixedThreadPool : ExecutorService
         queue.Add(() => future.Complete(callable));
         return future;
     }
+
+    public override void Execute(Action command) => queue.Add(command);
 
     public override void Dispose()
     {
@@ -80,6 +109,8 @@ file sealed class ImmediateExecutor : ExecutorService
         future.Complete(callable);
         return future;
     }
+
+    public override void Execute(Action command) => command();
 }
 
 file sealed class PromiseFuture<A> : IFuture<A>
