@@ -88,9 +88,63 @@ public static class Rng
         };
 }
 
-public delegate (A, IRng) Rand<A>(IRng rng);
+public delegate (A Value, IRng Rng) Rand<A>(IRng rng);
 
 public static class Rand
 {
     public static Rand<A> Unit<A>(A a) => r => (a, r);
+
+    public static Rand<int> Int => Rng.Int;
+    public static Rand<int> NonNegativeInt => Rng.NonNegativeInt;
+    public static Rand<int> NaturalNumber => Rng.NaturalNumber;
+    public static Rand<double> Double => Rng.Double;
+    public static Rand<bool> Bool => Rng.Bool;
+
+    extension<A>(Rand<A> underlying)
+    {
+        public (A Value, IRng Rng) Run(IRng rng) => underlying(rng);
+
+        public A Eval(IRng rng) => underlying(rng).Value;
+
+        public IRng Exec(IRng rng) => underlying(rng).Rng;
+
+        public Rand<B> Select<B>(Func<A, B> f) =>
+            underlying.SelectMany(a => Unit(f(a)));
+
+        public Rand<B> SelectMany<B>(Func<A, Rand<B>> f) =>
+            r =>
+            {
+                var (a, r1) = underlying(r);
+                return f(a)(r1);
+            };
+
+        public Rand<C> SelectMany<B, C>(Func<A, Rand<B>> f, Func<A, B, C> project) =>
+            underlying.SelectMany(a => f(a).Select(b => project(a, b)));
+
+        public Rand<C> Map2<B, C>(Rand<B> rb, Func<A, B, C> f) =>
+            from a in underlying
+            from b in rb
+            select f(a, b);
+    }
+
+    public static Rand<IEnumerable<A>> Sequence<A>(this IEnumerable<Rand<A>> actions) =>
+        actions.Aggregate(Unit(Enumerable.Empty<A>()),
+            (acc, a) => acc.Map2(a, (xs, x) => xs.Append(x)));
+
+    public static Rand<IEnumerable<B>> Traverse<A, B>(this IEnumerable<A> input, Func<A, Rand<B>> f) =>
+        input.Select(f).Sequence();
+
+    /// <summary>Runs the same action the given number of times, collecting each result.</summary>
+    public static Rand<IReadOnlyList<A>> Repeat<A>(this Rand<A> action, int times) =>
+        Enumerable.Repeat(action, times)
+            .Sequence()
+            .Select(results => (IReadOnlyList<A>)results.ToList());
+
+    /// <summary>Rolls the same action twice and keeps the higher of the two results.</summary>
+    public static Rand<int> WithAdvantage(this Rand<int> self) =>
+        self.Repeat(2).Select(results => results.Max());
+
+    /// <summary>Rolls the same action twice and keeps the lower of the two results.</summary>
+    public static Rand<int> WithDisadvantage(this Rand<int> self) =>
+        self.Repeat(2).Select(results => results.Min());
 }
