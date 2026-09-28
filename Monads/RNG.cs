@@ -139,12 +139,4 @@ public static class Rand
         Enumerable.Repeat(action, times)
             .Sequence()
             .Select(results => (IReadOnlyList<A>)results.ToList());
-
-    /// <summary>Rolls the same action twice and keeps the higher of the two results.</summary>
-    public static Rand<int> WithAdvantage(this Rand<int> self) =>
-        self.Repeat(2).Select(results => results.Max());
-
-    /// <summary>Rolls the same action twice and keeps the lower of the two results.</summary>
-    public static Rand<int> WithDisadvantage(this Rand<int> self) =>
-        self.Repeat(2).Select(results => results.Min());
 }

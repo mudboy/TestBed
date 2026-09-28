@@ -139,32 +139,4 @@ public sealed class RandTests
 
         repeated.Should().Equal(first, second, third);
     }
-
-    [Fact]
-    public void WithAdvantage_Runs_The_Action_Twice_And_Keeps_The_Higher_Value()
-    {
-        var d20 = Rand.NaturalNumber.Select(i => 1 + i % 20);
-        var rng = Rng.Simple(2024);
-
-        var advantage = d20.WithAdvantage().Eval(rng);
-
-        var (first, rngAfterFirst) = d20.Run(rng);
-        var second = d20.Eval(rngAfterFirst);
-
-        advantage.Should().Be(Math.Max(first, second));
-    }
-
-    [Fact]
-    public void WithDisadvantage_Runs_The_Action_Twice_And_Keeps_The_Lower_Value()
-    {
-        var d20 = Rand.NaturalNumber.Select(i => 1 + i % 20);
-        var rng = Rng.Simple(2024);
-
-        var disadvantage = d20.WithDisadvantage().Eval(rng);
-
-        var (first, rngAfterFirst) = d20.Run(rng);
-        var second = d20.Eval(rngAfterFirst);
-
-        disadvantage.Should().Be(Math.Min(first, second));
-    }
 }

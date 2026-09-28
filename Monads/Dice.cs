@@ -21,10 +21,10 @@ public sealed record Dice(int NumberOfDice, int Faces)
     public Rand<int> CountOf(int value) => Roll().Select(rolls => rolls.Count(r => r == value));
 
     /// <summary>Rolls this dice twice and keeps the higher total.</summary>
-    public Rand<int> WithAdvantage => Total.WithAdvantage();
+    public Rand<int> WithAdvantage => Total.Repeat(2).Select(totals => totals.Max());
 
     /// <summary>Rolls this dice twice and keeps the lower total.</summary>
-    public Rand<int> WithDisadvantage => Total.WithDisadvantage();
+    public Rand<int> WithDisadvantage => Total.Repeat(2).Select(totals => totals.Min());
 
     private Rand<int> RollOne =>
         rng =>
